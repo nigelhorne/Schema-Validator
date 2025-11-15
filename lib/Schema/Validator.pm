@@ -15,11 +15,263 @@ our $VERSION = '0.01';
 our %dynamic_properties;	# Global variable to store property definitions
 our %dynamic_schema;	# Global variable to store class definitions
 
+=head1 NAME
+
+Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 SYNOPSIS
+
+    use Schema::Validator qw(is_valid_datetime load_dynamic_vocabulary);
+    
+    # Validate datetime strings
+    if (is_valid_datetime('2024-11-14')) {
+        print "Valid date\n";
+    }
+    
+    if (is_valid_datetime('2024-11-14T15:30:00')) {
+        print "Valid datetime\n";
+    }
+    
+    # Load Schema.org vocabulary
+    my %schema = load_dynamic_vocabulary();
+    
+    # Access loaded schema definitions
+    print "Classes: ", scalar(keys %Schema::Validator::dynamic_schema), "\n";
+    print "Properties: ", scalar(keys %Schema::Validator::dynamic_properties), "\n";
+
+=head1 DESCRIPTION
+
+Schema::Validator provides utilities for working with Schema.org structured data vocabularies.
+It includes functions for validating datetime formats and dynamically loading Schema.org class
+and property definitions from the official Schema.org JSON-LD vocabulary file.
+
+=head2 Schema.org Validator
+
+This repository contains a Schema.org validator that scans HTML files for embedded JSON-LD (`application/ld+json` blocks) and validates them against a local schema definition.
+It can optionally output diagnostics in SARIF format for GitHub Code Scanning integration.
+
+The Validator is a versatile tool designed to help you validate structured data embedded in your HTML files.
+At its core, the script parses HTML to extract
+
+  <script type="application/ld+json">
+
+blocks and validates the included JSON-LD against a set of built-in schema rules-verifying properties such as required fields,
+proper date formats (e.g., for startdate), enumerated values, and cross-field consistency
+(like ensuring a MusicEvent's performer is either a Person or a PerformingGroup).
+For basic usage, simply run
+
+  bin/validate-schema --file sample/sample.html
+
+to receive interactive console feedback about any missing or invalid properties.
+The file can be a URL.
+
+=head2 Integration with GitHub Actions
+
+To integrate with GitHub Code Scanning and CI/CD pipelines, you can activate SARIF output by adding the --github flag, which aggregates diagnostics into a schema_validation.sarif file.
+
+=head2 Dynamic Mode
+
+If you want your validations to be driven by the most current standards, the --dynamic flag instructs the tool to download and cache the latest Schema.org vocabulary (currently loading over 900 classes) so that dynamic validations can be performed against live schema definitions.
+ may combine these flags as needed-using --file with either or both of --github and --dynamic to tailor the tool for local testing,
+automated code analysis,
+or an in-depth schema audit.
+The module caches the downloaded vocabulary to minimize network requests and improve performance.
+
+=head1 PACKAGE VARIABLES
+
+=head2 %dynamic_schema
+
+    %Schema::Validator::dynamic_schema
+
+Global hash containing Schema.org class definitions, keyed by class label (e.g., 'Person',
+'Organization', 'Event'). Each value is a complete class definition from the Schema.org
+vocabulary.
+
+This variable is populated by calling C<load_dynamic_vocabulary()>.
+
+=head2 %dynamic_properties
+
+    %Schema::Validator::dynamic_properties
+
+Global hash containing Schema.org property definitions, keyed by property label (e.g., 'name',
+'email', 'address'). Each value is a complete property definition from the Schema.org vocabulary.
+
+This variable is populated by calling C<load_dynamic_vocabulary()>.
+
+=head1 DEPENDENCIES
+
+This module requires the following Perl modules:
+
+=over 4
+
+=item * L<JSON::MaybeXS> - JSON encoding/decoding
+
+=item * L<LWP::UserAgent> - HTTP client for downloading vocabulary
+
+=item * L<Encode> - Character encoding utilities
+
+=back
+
+=head1 FILES
+
+=head2 schemaorg_dynamic_vocabulary.jsonld
+
+Cache file created in the current working directory. Contains the downloaded Schema.org
+vocabulary in JSON-LD format. Automatically refreshed when older than 24 hours.
+
+=head1 ERROR HANDLING
+
+The module uses warnings rather than fatal errors for most failure conditions:
+
+=over 4
+
+=item * Failed HTTP requests emit a warning and return empty results
+
+=item * JSON parse errors emit a warning and return empty results
+
+=item * File I/O errors emit warnings but attempt to continue operation
+
+=back
+
+This allows the calling code to continue execution even if vocabulary loading fails.
+
+=head1 EXAMPLES
+
+=head2 Basic Usage
+
+    use Schema::Validator qw(is_valid_datetime load_dynamic_vocabulary);
+    
+    # Validate user input
+    my $date_input = '2024-11-14';
+    unless (is_valid_datetime($date_input)) {
+        die "Invalid date format\n";
+    }
+    
+    # Load Schema.org vocabulary
+    load_dynamic_vocabulary();
+    
+    # Check if a specific class exists
+    if (exists $Schema::Validator::dynamic_schema{'Product'}) {
+        print "Product class is defined in Schema.org\n";
+    }
+
+=head2 Working with Loaded Vocabulary
+
+    use Schema::Validator qw(load_dynamic_vocabulary);
+    use Data::Dumper;
+    
+    # Load vocabulary
+    my %classes = load_dynamic_vocabulary();
+    
+    # Examine a specific class
+    if (my $person = $Schema::Validator::dynamic_schema{'Person'}) {
+        print "Person class definition:\n";
+        print Dumper($person);
+    }
+    
+    # List all available properties
+    my @props = keys %Schema::Validator::dynamic_properties;
+    print "Available properties: ", join(', ', sort @props), "\n";
+
+=head2 is_valid_datetime
+
+    my $is_valid = is_valid_datetime($string);
+
+Validates whether a string matches valid datetime formats.
+
+B<Parameters:>
+
+=over 4
+
+=item * C<$string> - The string to validate
+
+=back
+
+B<Returns:> Boolean (1 for valid, 0 for invalid)
+
+B<Accepted formats:>
+
+=over 4
+
+=item * C<YYYY-MM-DD> - Date only (e.g., "2024-11-14")
+
+=item * C<YYYY-MM-DDTHH:MM> - Date with time (e.g., "2024-11-14T15:30")
+
+=item * C<YYYY-MM-DD HH:MM> - Date with time, space separator (e.g., "2024-11-14 15:30")
+
+=item * C<YYYY-MM-DDTHH:MM:SS> - Date with time including seconds (e.g., "2024-11-14T15:30:45")
+
+=item * C<YYYY-MM-DD HH:MM:SS> - Date with time including seconds, space separator
+
+=back
+
+B<Example:>
+
+    if (is_valid_datetime('2024-11-14T15:30:00')) {
+        print "Valid ISO 8601 datetime\n";
+    }
+
+=cut
+
 # Validates that a string is in YYYY-MM-DD or YYYY-MM-DDTHH:MM(:SS)? format.
 sub is_valid_datetime {
 	my $val = shift;
 	return $val =~ /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?$/;
 }
+
+=head2 load_dynamic_vocabulary
+
+    my %classes = load_dynamic_vocabulary();
+
+Downloads and parses the Schema.org vocabulary from the official source, extracting class
+and property definitions. The vocabulary is cached locally for 24 hours to reduce network
+overhead.
+
+B<Parameters:> None
+
+B<Returns:> Hash mapping class labels to their complete Schema.org definitions
+
+B<Side effects:>
+
+=over 4
+
+=item * Populates C<%Schema::Validator::dynamic_schema> with class definitions
+
+=item * Populates C<%Schema::Validator::dynamic_properties> with property definitions
+
+=item * Creates/updates cache file C<schemaorg_dynamic_vocabulary.jsonld> in the current directory
+
+=item * Emits warnings on download, parse, or file I/O errors
+
+=back
+
+B<Cache behavior:>
+
+The function maintains a local cache file (C<schemaorg_dynamic_vocabulary.jsonld>) that
+expires after 24 hours. If the cache is valid, the vocabulary is loaded from the cache
+rather than downloading from Schema.org.
+
+B<Example:>
+
+    my %schema_classes = load_dynamic_vocabulary();
+    
+    # Access specific class definition
+    if (exists $Schema::Validator::dynamic_schema{'Person'}) {
+        my $person_def = $Schema::Validator::dynamic_schema{'Person'};
+        print "Person class loaded\n";
+    }
+    
+    # Access property definitions
+    if (exists $Schema::Validator::dynamic_properties{'name'}) {
+        my $name_prop = $Schema::Validator::dynamic_properties{'name'};
+        print "Name property loaded\n";
+    }
+
+=cut
 
 # Loads the dynamic Schema.org vocabulary from Schema.org and returns a hash mapping class labels to their definitions.
 sub load_dynamic_vocabulary {
@@ -114,5 +366,65 @@ sub load_dynamic_vocabulary {
 
 	return %dynamic_schema;
 }
+
+=head1 AUTHOR
+
+Nigel Horne, C<< <njh at nigelhorne.com> >>
+
+=head1 BUGS
+
+=over 4
+
+=item * Cache file is stored in the current working directory, which may cause issues with
+file permissions or multiple concurrent processes
+
+=item * No timezone support in datetime validation
+
+=item * Cache invalidation is time-based only; no checksums or version checking
+
+=item * Network failures during vocabulary download return empty results rather than using
+stale cache
+
+=back
+
+=head1 SEE ALSO
+
+=over 4
+
+=item * L<https://schema.org/> - Schema.org structured data vocabulary
+
+=item * L<JSON::MaybeXS> - JSON encoding/decoding
+
+=item * L<LWP::UserAgent> - HTTP client library
+
+=back
+
+=head1 REPOSITORY
+
+L<https://github.com/nigelhorne/schema-validator>
+
+=head1 SUPPORT
+
+This module is provided as-is without any warranty.
+
+=head1 LICENCE AND COPYRIGHT
+
+Copyright 2025 Nigel Horne.
+
+Usage is subject to licence terms.
+
+The licence terms of this software are as follows:
+
+=over 4
+
+=item * Personal single user, single computer use: GPL2
+
+=item * All other users (including Commercial, Charity, Educational, Government)
+  must apply in writing for a licence for use from Nigel Horne at the
+  above e-mail.
+
+=back
+
+=cut
 
 1;
