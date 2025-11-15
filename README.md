@@ -8,6 +8,12 @@ Version 0.01
 
 # SYNOPSIS
 
+## FROM THE COMMAND LINE
+
+    bin/validate-schema --file index.html
+
+## FROM PERL
+
     use Schema::Validator qw(is_valid_datetime load_dynamic_vocabulary);
     
     # Validate datetime strings
@@ -32,7 +38,7 @@ Schema::Validator provides utilities for working with Schema.org structured data
 It includes functions for validating datetime formats and dynamically loading Schema.org class
 and property definitions from the official Schema.org JSON-LD vocabulary file.
 
-## Schema.org Validator
+## Command Line Schema.org Validator
 
 This repository contains a Schema.org validator that scans HTML files for embedded JSON-LD (\`application/ld+json\` blocks) and validates them against a local schema definition.
 It can optionally output diagnostics in SARIF format for GitHub Code Scanning integration.
@@ -52,12 +58,12 @@ For basic usage, simply run
 to receive interactive console feedback about any missing or invalid properties.
 The file can be a URL.
 
-## Integration with GitHub Actions
+### Integration with GitHub Actions
 
 To integrate with GitHub Code Scanning and CI/CD pipelines, you can activate SARIF output by adding the `--github` flag,
 which aggregates diagnostics into a schema\_validation.sarif file.
 
-## Dynamic Mode
+### Dynamic Mode
 
 If you want your validations to be driven by the most current standards, the `--dynamic` flag instructs the tool to download and cache the latest Schema.org vocabulary (currently loading over 900 classes) so that dynamic validations can be performed against live schema definitions.
  may combine these flags as needed-using `--file` with either or both of `--github` and `--dynamic` to tailor the tool for local testing,
