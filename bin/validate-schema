@@ -3,6 +3,10 @@ use strict;
 use warnings;
 use autodie qw(:all);
 
+# These work
+# curl https://event.example.com | validate-schema --dynamic
+# validate-schema --dynamic --file https://event.example.com
+
 use DateTime::Format::ISO8601;
 use Mojo::DOM;
 use JSON::MaybeXS qw(decode_json encode_json);
@@ -23,9 +27,9 @@ GetOptions(
 	'file=s' => \$file,
 	'github' => \$github_mode,
 	'dynamic' => \$dynamic_mode,
-) or die "Usage: $0 --file input.html [--github] [--dynamic]";
+) or die "Usage: $0 [--file input.html] [--github] [--dynamic].\nIf file is not given, use STDIN.\nDoes the right thing if file starts with http:// or https://";
 
-die "Usage: $0 --file input.html [--github] [--dynamic]" unless $file;
+# die "Usage: $0 --file input.html [--github] [--dynamic]" unless $file;
 
 my $cache_dir = $ENV{'CACHE_DIR'};
 
@@ -82,7 +86,11 @@ my %schema = (
 #-----------------------------------------------------------------
 # Read the input file in raw mode and decode from Windows-1252.
 my $html;
-if ($file =~ m{^https?://}) {
+if(!defined($file)) {
+	while(my $line = <>) {
+		$html .= $line;
+	}
+} elsif($file =~ m{^https?://}) {
 	# It's a URL, fetch it using LWP::UserAgent
 	my $ua = LWP::UserAgent->new(timeout => 15);
 	my $response = $ua->get($file);
