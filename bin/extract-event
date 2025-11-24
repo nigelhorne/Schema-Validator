@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# Print the details of an event at a URL
+
 use strict;
 use warnings;
 use feature 'say';
@@ -7,7 +9,7 @@ use feature 'say';
 use LWP::UserAgent;
 use JSON qw(decode_json);
 
-my $url = shift or die "Usage: $0 <event-url>\n";
+my $url = shift or die "Usage: $0 <event-url>";
 
 my $ua = LWP::UserAgent->new(timeout => 10);
 my $res = $ua->get($url);
