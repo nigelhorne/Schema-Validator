@@ -9,7 +9,7 @@ use JSON qw(decode_json);
 use HTML::TreeBuilder;
 
 my $url = shift or die "Usage: $0 url";
-my $ua  = LWP::UserAgent->new(timeout => 10);
+my $ua = LWP::UserAgent->new(timeout => 10);
 my $res = $ua->get($url);
 die "Failed to fetch $url: ", $res->status_line unless $res->is_success();
 my $html = $res->decoded_content;
@@ -38,14 +38,14 @@ for my $blk (@blocks) {
 
 # Prepare result fields
 my %info = (
-	title	   => undef,
-	organizer   => undef,
+	title	=> undef,
+	organizer => undef,
 	organizer_url => undef,
-	venue	   => undef,
+	venue	=> undef,
 	address	 => undef,
 	date		=> undef,
 	time		=> undef,
-	event_url   => undef,
+	event_url => undef,
 	description => undef,
 );
 
@@ -58,10 +58,10 @@ if ($event) {
 	if ($event->{organizer}) {
 		if (ref $event->{organizer} eq 'ARRAY') {
 			$info{organizer}	 = $event->{organizer}[0]{name} // '';
-			$info{organizer_url} = $event->{organizer}[0]{url}  // '';
+			$info{organizer_url} = $event->{organizer}[0]{url} // '';
 		} else {
 			$info{organizer}	 = $event->{organizer}{name} // '';
-			$info{organizer_url} = $event->{organizer}{url}  // '';
+			$info{organizer_url} = $event->{organizer}{url} // '';
 		}
 	}
 
@@ -75,7 +75,7 @@ if ($event) {
 			for my $field (qw/streetAddress addressLocality addressRegion postalCode addressCountry/) {
 				push @parts, $addr->{$field} if defined $addr->{$field};
 			}
-			$info{address} = join(", ", @parts) if @parts;
+			$info{address} = join(', ', @parts) if @parts;
 		}
 	}
 
@@ -85,7 +85,7 @@ if ($event) {
 			$info{date} = $1;
 			$info{time} = $2;
 		} else {
-			$info{date} = $start;  # fallback
+			$info{date} = $start;	# fallback
 		}
 	}
 
@@ -138,7 +138,7 @@ if (!defined $info{venue} or $info{venue} eq '') {
 
 # Description fallback
 if (!defined $info{description} or $info{description} eq '') {
-	if (my $about = $tree->look_down(_tag => 'div', sub { $_[0]->attr('id') && $_[0]->attr('id') eq "about" })) {
+	if (my $about = $tree->look_down(_tag => 'div', sub { $_[0]->attr('id') && $_[0]->attr('id') eq 'about' })) {
 		$info{description} = $about->as_text;
 	} else {
 		# Try generic paragraph under "About the event"
