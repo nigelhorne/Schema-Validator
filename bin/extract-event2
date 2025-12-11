@@ -154,8 +154,8 @@ $tree->delete();
 # Print results
 # --------------------
 say "Title:\t\t$info{title}";
-say "Organizer:\t$info{organizer}";
-say "Organizer URL:\t$info{organizer_url}";
+say "Organizer:\t$info{organizer}" if($info{'organizer'});
+say "Organizer URL:\t$info{organizer_url}" if($info{'organizer_url'});
 say "Venue:\t\t$info{venue}";
 say "Address:\t$info{address}";
 say "Date:\t\t$info{date}";
