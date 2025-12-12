@@ -30,6 +30,7 @@ WriteMakefile(
 	'DEFINE' => '',	# e.g., '-DHAVE_SOMETHING'
 	'INC' => '',	# e.g., '-I/usr/include/other'
 	PL_FILES	=> {},
+	EXE_FILES => [ 'bin/extract-event', 'bin/extract-event2', 'bin/validate-schema' ],
 	CONFIGURE_REQUIRES => {
 		'ExtUtils::MakeMaker' => 6.64,	# Minimum version for TEST_REQUIRES
 	}, TEST_REQUIRES => {
