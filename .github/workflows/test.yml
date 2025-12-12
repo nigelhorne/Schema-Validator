@@ -20,7 +20,7 @@ jobs:
 
       - name: Install CPAN dependencies
         run: |
-          # cpanm --installdeps .
+          cpanm --installdeps .
           cpanm -iqn --skip-satisfied Mojo::DOM JSON::MaybeXS Encode Getopt::Long Test::Most FindBin LWP::Protocol::https IPC::System::Simple Locale::Country DateTime::Format::ISO8601 File::HomeDir
 
       - name: Run Schema.org validator
@@ -29,5 +29,10 @@ jobs:
           perl bin/validate-schema --file samples/sample2.html --dynamic
           perl bin/validate-schema --file samples/sample3.html --dynamic
 
-      - name: Run unit tests
-        run: prove -l
+      - name: Run Tests
+        env:
+          AUTOMATED_TESTING: 1
+          NO_NETWORK_TESTING: 1
+          NONINTERACTIVE_TESTING: 1
+          # CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: prove -l -b t
