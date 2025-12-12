@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More tests => 5;
+
+use Test::Most tests => 5;
 use FindBin;
 use lib "$FindBin::Bin/../lib";  # add the lib directory to @INC
 

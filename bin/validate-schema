@@ -157,7 +157,7 @@ if ($github_mode) {
 						version => '1.2',
 						rules => [
 							{ id => 'SCHEMA000', name => 'Missing @type' },
-							{ id => 'SCHEMA001', name => "Missing required property" },
+							{ id => 'SCHEMA001', name => 'Missing required property' },
 							{ id => 'SCHEMA003', name => "Invalid property format" },
 							{ id => 'SCHEMA004', name => "Unexpected enumerated value" },
 							{ id => 'SCHEMA005', name => "Invalid performer type" },
@@ -267,8 +267,8 @@ sub validate_entity {
 		my $rules = $schema{$type};
 		# Check required properties.
 		for my $req (@{ $rules->{required} }) {
-			unless (exists $entity->{$req}) {
-				push_validation("SCHEMA001", "Missing required property '$req' for type '$type'", ($currentPath || 'root'));
+			if((!exists $entity->{$req}) && (!exists $entity->{lc($req)})) {
+				push_validation('SCHEMA001', "Missing required property '$req' for type '$type'", ($currentPath || 'root'));
 			}
 		}
 
