@@ -1,6 +1,7 @@
 bin/extract-event
 bin/extract-event2
 bin/validate-schema
+Changes
 lib/Schema/Validator.pm
 LICENSE
 Makefile.PL
@@ -11,3 +12,5 @@ samples/sample2.html
 samples/sample3.html
 samples/sample4.html
 t/30-basics.t
+t/eof.t
+t/eol.t

@@ -55,12 +55,13 @@ WriteMakefile(
 				type => 'git',
 				url => 'git://github.com/nigelhorne/Schema-Validator.git',
 				web => 'https://github.com/nigelhorne/Schema-Validator',
-				# license    => 'http://dev.perl.org/licenses/',
+				# license  => 'http://dev.perl.org/licenses/',
 			}, bugtracker => {
 				mailto => 'bug-Schema-Validator@rt.cpan.org',
-				url => 'https://github.com/nigelhorne/Schema-Validator/issues',
-				# web => 'https://rt.cpan.org/Public/Dist/Display.html?Name=Schema-Validator',
-				web => 'https://github.com/nigelhorne/Schema-Validator/issues'
+				url => 'https://rt.cpan.org/Public/Dist/Display.html?Name=Schema-Validator',
+				web => 'https://rt.cpan.org/Public/Dist/Display.html?Name=Schema-Validator',
+				# url => 'https://github.com/nigelhorne/Schema-Validator/issues',
+				# web => 'https://github.com/nigelhorne/Schema-Validator/issues'
 			}
 		},
 	},
