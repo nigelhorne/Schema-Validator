@@ -40,6 +40,7 @@ WriteMakefile(
 		'Test::Needs' => 0,
 		'Test::RequiresInternet' => 0,
 	}, PREREQ_PM => {
+		'LWP::Protocol::https' => 0,
 		'LWP::UserAgent' => 0,
 		'JSON::MaybeXS' => 0,
 	}, dist => $dist,
