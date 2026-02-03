@@ -38,13 +38,13 @@ for my $blk (@blocks) {
 
 # Prepare result fields
 my %info = (
-	title	=> undef,
+	title => undef,
 	organizer => undef,
 	organizer_url => undef,
 	venue	=> undef,
 	address	 => undef,
 	date		=> undef,
-	time		=> undef,
+	time	=> undef,
 	event_url => undef,
 	description => undef,
 );
@@ -159,6 +159,6 @@ say "Organizer URL:\t$info{organizer_url}" if($info{'organizer_url'});
 say "Venue:\t\t$info{venue}";
 say "Address:\t$info{address}";
 say "Date:\t\t$info{date}";
-say "Time:\t\t$info{time}";
+say "Time:\t\t$info{time}" if(defined $info{time});
 say "Event URL:\t$info{event_url}";
 say "Description:\t$info{description}";
