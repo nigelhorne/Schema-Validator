@@ -1,6 +1,6 @@
 Revision history for Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
 
-0.02
+0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin
 	LWP::Protocol::https declared as prerequisite
 
