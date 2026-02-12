@@ -226,8 +226,8 @@ B<Example:>
 
 # Validates that a string is in YYYY-MM-DD or YYYY-MM-DDTHH:MM(:SS)? format.
 sub is_valid_datetime {
-	my $val = shift;
-	return $val =~ /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?$/;
+	my $string = $_[0];
+	return $string =~ /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?$/;
 }
 
 =head2 load_dynamic_vocabulary
