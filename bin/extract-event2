@@ -41,7 +41,7 @@ my %info = (
 	title => undef,
 	organizer => undef,
 	organizer_url => undef,
-	venue	=> undef,
+	venue => undef,
 	address	 => undef,
 	date		=> undef,
 	time	=> undef,
@@ -72,10 +72,14 @@ if ($event) {
 			# Compose a simple address
 			my $addr = $event->{location}{address};
 			my @parts;
-			for my $field (qw/streetAddress addressLocality addressRegion postalCode addressCountry/) {
-				push @parts, $addr->{$field} if defined $addr->{$field};
+			if(ref($addr)) {
+				for my $field (qw/streetAddress addressLocality addressRegion postalCode addressCountry/) {
+					push @parts, $addr->{$field} if defined $addr->{$field};
+				}
+				$info{address} = join(', ', @parts) if @parts;
+			} else {
+				$info{address} = $addr;
 			}
-			$info{address} = join(', ', @parts) if @parts;
 		}
 	}
 
