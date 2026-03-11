@@ -282,14 +282,14 @@ B<Example:>
 
 # Loads the dynamic Schema.org vocabulary from Schema.org and returns a hash mapping class labels to their definitions.
 sub load_dynamic_vocabulary {
-	my $cache_file	 = 'schemaorg_dynamic_vocabulary.jsonld';
+	my $cache_file = 'schemaorg_dynamic_vocabulary.jsonld';
 	my $cache_duration = 86400;	# Cache expires in 1 day (86400 seconds)
 	my $content;
 	my $use_cache = 0;
 
 	if (-e $cache_file) {
 		my $mtime = (stat($cache_file))[9];
-		if ( time - $mtime < $cache_duration ) {
+		if(time - $mtime < $cache_duration) {
 			$use_cache = 1;
 		}
 	}
@@ -305,10 +305,10 @@ sub load_dynamic_vocabulary {
 	} else {
 		# Download the vocabulary from Schema.org
 		my $url = 'https://schema.org/version/latest/schemaorg-current-https.jsonld';
-		my $ua = LWP::UserAgent->new( timeout => 30 );
+		my $ua = LWP::UserAgent->new(timeout => 30);
 		my $res = $ua->get($url);
 		unless ($res->is_success) {
-			warn "Failed to fetch dynamic vocabulary from $url: " . $res->status_line;
+			warn "Failed to fetch dynamic vocabulary from $url: ", $res->status_line();
 			return ();
 		}
 		$content = $res->decoded_content;
