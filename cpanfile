@@ -9,6 +9,7 @@ requires 'LWP::UserAgent';
 on 'configure' => sub {
 	requires 'ExtUtils::MakeMaker', '6.64';
 };
+
 on 'test' => sub {
 	requires 'FindBin';
 	requires 'Test::DescribeMe';
@@ -16,6 +17,7 @@ on 'test' => sub {
 	requires 'Test::Needs';
 	requires 'Test::RequiresInternet';
 };
+
 on 'develop' => sub {
 	requires 'Devel::Cover';
 	requires 'Perl::Critic';
