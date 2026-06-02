@@ -40,10 +40,10 @@ definitions as a hashref and via package globals.
 Runtime behaviour is controlled by the package-level `%Schema::Validator::config`
 hash.  Supported keys and their defaults:
 
-    cache_file     => 'schemaorg_dynamic_vocabulary.jsonld'   # CWD-relative
-    cache_duration => 86400                                   # seconds
+    cache_file     => "$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld"  # or tmpdir
+    cache_duration => 86400                                          # seconds
     vocab_url      => 'https://schema.org/.../schemaorg-current-https.jsonld'
-    ua_timeout     => 30                                      # seconds
+    ua_timeout     => 30                                             # seconds
 
 Override any key before calling an exported function:
 
@@ -142,10 +142,133 @@ Timezone designators (`Z`, `+HH:MM`, `-HH:MM`) are now accepted.
     {
         type => 'boolean'
         description  => '1 (valid) or 0 (invalid, undef, or empty input)'
-        optional => 0
     }
 
-### FORMAL SPECIFICATION
+## load\_dynamic\_vocabulary
+
+### PURPOSE
+
+Downloads the complete Schema.org vocabulary from the official JSON-LD
+endpoint, parses it into class and property lookup tables, caches the raw
+JSON-LD locally, and returns the class table as a hashref.
+
+The cache is considered fresh for `cache_duration` seconds (default 24 hours).
+On network failure the function falls back to a stale cache rather than
+returning an empty result, and emits a `carp` warning.
+
+### ARGUMENTS
+
+All arguments are optional; defaults come from `%Schema::Validator::config`.
+
+- `cache_file` (optional, scalar) -- path to the local cache file.
+Defaults to `$config{cache_file}`: `$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld`
+if `$ENV{CACHEDIR}` is set, otherwise `File::Spec->tmpdir()` is used.
+- `cache_duration` (optional, scalar) -- cache validity window in seconds.
+Defaults to `$config{cache_duration}`.
+- `vocab_url` (optional, scalar) -- URL of the JSON-LD vocabulary endpoint.
+Defaults to `$config{vocab_url}`.
+- `ua_timeout` (optional, scalar) -- LWP::UserAgent timeout in seconds.
+Defaults to `$config{ua_timeout}`.
+
+Both zero-argument and named calling conventions are supported:
+
+    load_dynamic_vocabulary();
+    load_dynamic_vocabulary(ua_timeout => 60);
+
+### RETURNS
+
+A hashref mapping class labels (e.g. `'Person'`) to their raw JSON-LD
+definition hashrefs from the `@graph` array.
+
+Returns an empty hashref `{}` on all failure paths (network unreachable,
+no cache, JSON parse error).  Never throws.
+
+### SIDE EFFECTS
+
+- Populates `%Schema::Validator::dynamic_schema` with class definitions.
+- Populates `%Schema::Validator::dynamic_properties` with property definitions.
+- Creates or updates the local cache file on a successful download.
+- Emits `carp` warnings on network failures, I/O errors, or JSON
+parse errors.
+
+### NOTES
+
+The default cache directory is determined once at module load time: the
+`$CACHEDIR` environment variable is used if set; otherwise `File::Spec->tmpdir()`
+is used (typically `/tmp` on Unix).  Override for the session with:
+
+    $Schema::Validator::config{cache_file} = '/my/path/vocab.jsonld';
+
+The `bin/validate-schema` CLI tool imports this function from the module and
+uses `cache_file => $path` to store its cache under `~/.cache/schema_validator/`.
+
+### EXAMPLE
+
+    use Schema::Validator qw(load_dynamic_vocabulary);
+
+    my $classes = load_dynamic_vocabulary();
+    printf "%d classes loaded\n", scalar keys %{$classes};
+
+    # Check for a specific class in the returned hashref
+    print "Has Person\n" if exists $classes->{'Person'};
+
+    # Or query the package globals directly after the call
+    Schema::Validator::load_dynamic_vocabulary();
+    my @names = sort keys %Schema::Validator::dynamic_schema;
+
+### API SPECIFICATION
+
+#### Input (Params::Validate::Strict)
+
+    {
+        cache_file     => { type => 'string', optional => 1 },
+        cache_duration => { type => 'string', optional => 1 },
+        vocab_url      => { type => 'string', optional => 1 },
+        ua_timeout     => { type => 'string', optional => 1 },
+    }
+
+#### Output (Return::Set)
+
+    {
+        type  => 'hashref',
+        description  => 'class-label => JSON-LD item hashref'
+        # ON_FAILURE   => 'empty hashref {}; never throws'
+        # SIDE_EFFECTS => 'populates %dynamic_schema and %dynamic_properties'
+    }
+
+# FILES
+
+## schemaorg\_dynamic\_vocabulary.jsonld
+
+Cache file written to `$CACHEDIR` (if set) or the system temporary directory
+(`File::Spec->tmpdir()`), unless overridden via `$config{cache_file}`.
+Contains the downloaded Schema.org vocabulary in JSON-LD format.  Refreshed
+when older than `$config{cache_duration}` seconds.
+
+# ERROR HANDLING
+
+The module uses `carp` rather than `die` for recoverable failures:
+
+- Failed HTTP requests emit `carp` and trigger the stale-cache fallback.
+- JSON parse errors emit `carp` and return `{}`.
+- File I/O errors emit `carp`; the download path is attempted next.
+- `croak` is reserved for programmer errors (bad argument types).
+
+# BUGS
+
+- Cache invalidation is time-based only; no checksum or version check.
+
+# SEE ALSO
+
+- [Test Dashboard](https://nigelhorne.github.io/Schema-Validator/coverage/)
+
+# REPOSITORY
+
+[https://github.com/nigelhorne/schema-validator](https://github.com/nigelhorne/schema-validator)
+
+## FORMAL SPECIFICATION
+
+### is\_valid\_datetime
 
     Let CHAR denote the set of all Unicode code points and
     DIGIT = { c : CHAR | c in {'0'..'9'} }.
@@ -183,95 +306,7 @@ Timezone designators (`Z`, `+HH:MM`, `-HH:MM`) are now accepted.
      result! ⟺ str? ∈ DATETIME
     ──────────────────────────────────────────────────────────────
 
-## load\_dynamic\_vocabulary
-
-### PURPOSE
-
-Downloads the complete Schema.org vocabulary from the official JSON-LD
-endpoint, parses it into class and property lookup tables, caches the raw
-JSON-LD locally, and returns the class table as a hashref.
-
-The cache is considered fresh for `cache_duration` seconds (default 24 hours).
-On network failure the function falls back to a stale cache rather than
-returning an empty result, and emits a `carp` warning.
-
-### ARGUMENTS
-
-All arguments are optional; defaults come from `%Schema::Validator::config`.
-
-- `cache_file` (optional, scalar) -- path to the local cache file.
-Defaults to `$config{cache_file}` (CWD-relative).
-- `cache_duration` (optional, scalar) -- cache validity window in seconds.
-Defaults to `$config{cache_duration}`.
-- `vocab_url` (optional, scalar) -- URL of the JSON-LD vocabulary endpoint.
-Defaults to `$config{vocab_url}`.
-- `ua_timeout` (optional, scalar) -- LWP::UserAgent timeout in seconds.
-Defaults to `$config{ua_timeout}`.
-
-Both zero-argument and named calling conventions are supported:
-
-    load_dynamic_vocabulary();
-    load_dynamic_vocabulary(ua_timeout => 60);
-
-### RETURNS
-
-A hashref mapping class labels (e.g. `'Person'`) to their raw JSON-LD
-definition hashrefs from the `@graph` array.
-
-Returns an empty hashref `{}` on all failure paths (network unreachable,
-no cache, JSON parse error).  Never throws.
-
-### SIDE EFFECTS
-
-- Populates `%Schema::Validator::dynamic_schema` with class definitions.
-- Populates `%Schema::Validator::dynamic_properties` with property definitions.
-- Creates or updates the local cache file on a successful download.
-- Emits `carp` warnings on network failures, I/O errors, or JSON
-parse errors.
-
-### NOTES
-
-The module version of this function stores the cache relative to the process
-CWD.  Set `$Schema::Validator::config{cache_file}` to an absolute path if
-your application changes directory between calls.
-
-The `bin/validate-schema` CLI tool imports this function from the module and
-uses `cache_file => $path` to store its cache under `~/.cache/schema_validator/`,
-keeping a persistent home-directory cache independent of the process CWD.
-
-### EXAMPLE
-
-    use Schema::Validator qw(load_dynamic_vocabulary);
-
-    my $classes = load_dynamic_vocabulary();
-    printf "%d classes loaded\n", scalar keys %{$classes};
-
-    # Check for a specific class in the returned hashref
-    print "Has Person\n" if exists $classes->{'Person'};
-
-    # Or query the package globals directly after the call
-    Schema::Validator::load_dynamic_vocabulary();
-    my @names = sort keys %Schema::Validator::dynamic_schema;
-
-### API SPECIFICATION
-
-#### Input (Params::Validate::Strict)
-
-    {
-        cache_file     => { type => SCALAR, optional => 1 },
-        cache_duration => { type => SCALAR, optional => 1 },
-        vocab_url      => { type => SCALAR, optional => 1 },
-        ua_timeout     => { type => SCALAR, optional => 1 },
-    }
-
-#### Output (Return::Set)
-
-    RETURN_TYPE  => HASHREF
-    DESCRIPTION  => 'class-label => JSON-LD item hashref'
-    ON_FAILURE   => 'empty hashref {}; never throws'
-    SIDE_EFFECTS => 'populates %dynamic_schema and %dynamic_properties'
-
-### FORMAL SPECIFICATION
+### load\_dynamic\_library
 
     Let FILE, DUR, URL be the resolved config values.
     Let now : N be the current UNIX epoch time.
@@ -320,51 +355,6 @@ keeping a persistent home-directory cache independent of the process CWD.
 
      result! = dynamic_schema'
     ──────────────────────────────────────────────────────────────────────
-
-# DEPENDENCIES
-
-- [JSON::MaybeXS](https://metacpan.org/pod/JSON%3A%3AMaybeXS) -- JSON decoding
-- [LWP::UserAgent](https://metacpan.org/pod/LWP%3A%3AUserAgent) -- HTTP client for vocabulary download
-- [Params::Get](https://metacpan.org/pod/Params%3A%3AGet) -- positional/named parameter normalisation
-- [Params::Validate](https://metacpan.org/pod/Params%3A%3AValidate) -- runtime parameter type checking
-- [Readonly](https://metacpan.org/pod/Readonly) -- compile-time constants
-- [Encode](https://metacpan.org/pod/Encode) -- character encoding utilities
-
-Optional: [Object::Configure](https://metacpan.org/pod/Object%3A%3AConfigure) for injecting `%config` overrides without
-directly modifying the package namespace.
-
-# FILES
-
-## schemaorg\_dynamic\_vocabulary.jsonld
-
-Cache file written to the current working directory (or the path specified
-in `$config{cache_file}`).  Contains the downloaded Schema.org vocabulary
-in JSON-LD format.  Refreshed when older than `$config{cache_duration}`
-seconds.
-
-# ERROR HANDLING
-
-The module uses `carp` rather than `die` for recoverable failures:
-
-- Failed HTTP requests emit `carp` and trigger the stale-cache fallback.
-- JSON parse errors emit `carp` and return `{}`.
-- File I/O errors emit `carp`; the download path is attempted next.
-- `croak` is reserved for programmer errors (bad argument types).
-
-# BUGS
-
-- The CWD-relative cache file path may resolve unexpectedly when the
-calling application changes directory between calls.  Use an absolute path
-via `$config{cache_file}` to avoid this.
-- Cache invalidation is time-based only; no checksum or version check.
-
-# SEE ALSO
-
-- [Test Dashboard](https://nigelhorne.github.io/Schema-Validator/coverage/)
-
-# REPOSITORY
-
-[https://github.com/nigelhorne/schema-validator](https://github.com/nigelhorne/schema-validator)
 
 # AUTHOR
 

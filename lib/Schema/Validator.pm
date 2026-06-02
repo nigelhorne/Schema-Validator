@@ -71,8 +71,7 @@ Readonly::Scalar my $AT_GRAPH        => '@graph';
 Readonly::Scalar my $RDF_CLASS       => 'rdfs:Class';
 Readonly::Scalar my $RDF_PROPERTY    => 'rdf:Property';
 Readonly::Scalar my $RDFS_LABEL      => 'rdfs:label';
-Readonly::Scalar my $RDFS_LABEL_FULL =>
-	'http://www.w3.org/2000/01/rdf-schema#label';
+Readonly::Scalar my $RDFS_LABEL_FULL => 'http://www.w3.org/2000/01/rdf-schema#label';
 
 # ===========================================================================
 # CONFIGURATION
@@ -244,7 +243,6 @@ Timezone designators (C<Z>, C<+HH:MM>, C<-HH:MM>) are now accepted.
     {
         type => 'boolean'
         description  => '1 (valid) or 0 (invalid, undef, or empty input)'
-	optional => 0
     }
 
 =cut
