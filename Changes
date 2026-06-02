@@ -3,6 +3,16 @@ Revision history for Schema::Validator - Tools for validating and loading Schema
 0.03
 	[ Bug Fixes ]
 	- Handle address not being in parts
+	- Fix mkdir operator-precedence bug that silently ignored directory creation failures
+	- Fix cache read: open failure now warns gracefully instead of dereferencing undef filehandle
+	- Fix cache write: open failure now warns instead of crashing on undef filehandle print
+	- Fix TOCTOU race between file existence check and open by opening directly
+	- Add stale-cache fallback when network fetch of Schema.org vocabulary fails
+	- Fix exit code being overwritten by each validation error; first error now wins
+	- Fix enum validation false-positives for array/hash-valued JSON-LD properties
+	- Fix addressCountry static enum to use ISO 3166-1 alpha-2 codes (was mixed underscore strings)
+	- Fix Boolean property validation to accept JSON::PP::Boolean objects (decoded true/false)
+	- Fix country code validation to accept ISO 3166-1 alpha-3 codes (e.g. USA) as well as alpha-2
 
 0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin
