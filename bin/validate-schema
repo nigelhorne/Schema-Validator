@@ -9,7 +9,7 @@ use autodie qw(:all);
 
 use DateTime::Format::ISO8601;
 use Mojo::DOM;
-use JSON::MaybeXS qw(decode_json encode_json);
+use JSON::MaybeXS qw(decode_json encode_json is_bool);
 use Encode qw(decode);
 use File::Spec;
 use Getopt::Long;
@@ -42,7 +42,7 @@ if(!defined($cache_dir)) {
 }
 
 if(!-d $cache_dir) {
-	mkdir $cache_dir, 02755 || die "$cache_dir: $@";
+	mkdir($cache_dir, 02755) or die "$cache_dir: $!";
 }
 my $exit_code = 0;
 
@@ -71,8 +71,8 @@ my %schema = (
 	PostalAddress => {
 		required => [qw(addressCountry addressLocality)],
 		enum => {
-			# Allowed country values for demonstration. (Note: these are sample strings.)
-			addressCountry => [qw(United_States US Canada United_Kingdom)],
+			# ISO 3166-1 alpha-2 country codes
+			addressCountry => [qw(AU CA DE FR GB JP US)],
 		},
 	},
 	PerformingGroup => {
@@ -211,7 +211,7 @@ sub push_validation {
 		'SCHEMA_CTRY' => 20,	# invalid country code
 		# …add your other rule→code mappings here…
 	);
-	$exit_code = $exit_map{$rule} // 99;
+	$exit_code ||= $exit_map{$rule} // 99;
 }
 
 #-----------------------------------------------------------------
@@ -275,7 +275,7 @@ sub validate_entity {
 		# Check enumerated values.
 		if ($rules->{enum}) {
 			for my $prop (keys %{ $rules->{enum} }) {
-				if (exists $entity->{$prop}) {
+				if (exists $entity->{$prop} && !ref($entity->{$prop})) {
 					my @allowed = @{ $rules->{enum}->{$prop} };
 					unless (grep { $_ eq $entity->{$prop} } @allowed) {
 						push_validation("SCHEMA004", "Unexpected value '$entity->{$prop}' for property '$prop'", ($currentPath || 'root'));
@@ -393,13 +393,12 @@ sub validate_property_format
 				$valid = 1; last;
 			}
 		} elsif ($type eq 'Boolean') {
-			if ($value =~ /^(?:true|false)$/i) {
+			if (is_bool($value) || $value =~ /^(?:true|false)$/i) {
 				$valid = 1; last;
 			}
 		} elsif(($type eq 'Country') || ($type eq 'schema:Country')) {
-			# If this property is addressCountry, require 2-letter ISO code
 			my $code = uc($value);
-			if(Locale::Country::code2country($code)) {
+			if(Locale::Country::code2country($code, 'alpha-2') || Locale::Country::code2country($code, 'alpha-3')) {
 				$valid = 1; last;
 			}
 		} elsif(($type eq 'Gender') || ($type eq 'schema:GenderType')) {
@@ -525,35 +524,31 @@ sub load_dynamic_vocabulary
 	my $cache_file = File::Spec->catfile($cache_dir, 'schema_validator');
 	my $cache_duration = 86400;	# Cache expires in 1 day (86400 seconds)
 	my $content;
-	my $use_cache = 0;
 
 	if(!-d $cache_file) {
-		mkdir $cache_file, 02755 || die "$cache_file: $@";
+		mkdir($cache_file, 02755) or die "$cache_file: $!";
 	}
 	$cache_file = File::Spec->catfile($cache_file, 'schemaorg_dynamic_vocabulary.jsonld');
-	if (-e $cache_file) {
-		my $mtime = (stat($cache_file))[9];
-		if(time - $mtime < $cache_duration) {
-			$use_cache = 1;
+
+	# Open directly to avoid TOCTOU race between -e check and open
+	if (-e $cache_file && (time - (stat($cache_file))[9] < $cache_duration)) {
+		no autodie 'open';
+		if (open my $cfh, '<', $cache_file) {
+			local $/;
+			$content = <$cfh>;
+			close $cfh;
+		} else {
+			warn "Could not open cache file $cache_file: $!";
 		}
 	}
 
-	if($use_cache) {
-		# Read from the cache file
-		open my $cfh, '<', $cache_file or warn "Could not open cache file $cache_file: $!";
-		{
-			local $/;	# Slurp mode
-			$content = <$cfh>;
-		}
-		close $cfh;
-	} else {
+	unless (defined $content) {
 		# Download the vocabulary from Schema.org
 		if(eval { require HTTP::Cache::Transparent; }) {
 			HTTP::Cache::Transparent->import();
 			my $dir = File::Spec->catfile($cache_dir, 'http-cache-transparent');
 			HTTP::Cache::Transparent::init({
 				BasePath => $dir,
-				# Verbose => $opts{'v'} ? 1 : 0,
 				Verbose => 0,
 				NoUpdate => 60 * 60 * 24,
 				MaxAge => 30 * 24
@@ -566,16 +561,33 @@ sub load_dynamic_vocabulary
 		my $ua = LWP::UserAgent->new(timeout => 30);
 		my $res = $ua->get($url);
 
-		unless($res->is_success()) {
+		if ($res->is_success()) {
+			$content = $res->decoded_content;
+			{
+				no autodie 'open';
+				if (open my $cfh, '>', $cache_file) {
+					print $cfh $content;
+					close $cfh;
+				} else {
+					warn "Could not write to cache file $cache_file: $!";
+				}
+			}
+		} else {
 			warn "Failed to fetch dynamic vocabulary from $url: ", $res->status_line();
-			return ();
+			# Fall back to stale cache rather than returning nothing
+			{
+				no autodie 'open';
+				if (-e $cache_file && open(my $cfh, '<', $cache_file)) {
+					local $/;
+					$content = <$cfh>;
+					close $cfh;
+					warn "Using stale cache as fallback for $cache_file";
+				}
+			}
 		}
-		$content = $res->decoded_content;
-		# Write the downloaded content to the cache file.
-		open my $cfh, '>', $cache_file or warn "Could not write to cache file $cache_file: $!";
-		print $cfh $content;
-		close $cfh;
 	}
+
+	return () unless defined $content;
 
 	my $data = eval { decode_json($content) };
 	if ($@) {

@@ -285,38 +285,44 @@ sub load_dynamic_vocabulary {
 	my $cache_file = 'schemaorg_dynamic_vocabulary.jsonld';
 	my $cache_duration = 86400;	# Cache expires in 1 day (86400 seconds)
 	my $content;
-	my $use_cache = 0;
 
-	if (-e $cache_file) {
-		my $mtime = (stat($cache_file))[9];
-		if(time - $mtime < $cache_duration) {
-			$use_cache = 1;
+	# Open directly to avoid TOCTOU race between -e check and open
+	if (-e $cache_file && (time - (stat($cache_file))[9] < $cache_duration)) {
+		if (open my $cfh, '<', $cache_file) {
+			local $/;
+			$content = <$cfh>;
+			close $cfh;
+		} else {
+			warn "Could not open cache file $cache_file: $!";
 		}
 	}
 
-	if ($use_cache) {
-		# Read from the cache file
-		open my $cfh, '<', $cache_file or warn "Could not open cache file $cache_file: $!";
-		{
-			local $/;	# Slurp mode
-			$content = <$cfh>;
-		}
-		close $cfh;
-	} else {
+	unless (defined $content) {
 		# Download the vocabulary from Schema.org
 		my $url = 'https://schema.org/version/latest/schemaorg-current-https.jsonld';
 		my $ua = LWP::UserAgent->new(timeout => 30);
 		my $res = $ua->get($url);
-		unless ($res->is_success) {
+		if ($res->is_success) {
+			$content = $res->decoded_content;
+			if (open my $cfh, '>', $cache_file) {
+				print $cfh $content;
+				close $cfh;
+			} else {
+				warn "Could not write to cache file $cache_file: $!";
+			}
+		} else {
 			warn "Failed to fetch dynamic vocabulary from $url: ", $res->status_line();
-			return ();
+			# Fall back to stale cache rather than returning nothing
+			if (-e $cache_file && open(my $cfh, '<', $cache_file)) {
+				local $/;
+				$content = <$cfh>;
+				close $cfh;
+				warn "Using stale cache as fallback for $cache_file";
+			}
 		}
-		$content = $res->decoded_content;
-		# Write the downloaded content to the cache file.
-		open my $cfh, '>', $cache_file or warn "Could not write to cache file $cache_file: $!";
-		print $cfh $content;
-		close $cfh;
 	}
+
+	return () unless defined $content;
 
 	my $data = eval { decode_json($content) };
 	if ($@) {
@@ -388,9 +394,6 @@ file permissions or multiple concurrent processes
 =item * No timezone support in datetime validation
 
 =item * Cache invalidation is time-based only; no checksums or version checking
-
-=item * Network failures during vocabulary download return empty results rather than using
-stale cache
 
 =back
 

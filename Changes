@@ -1,7 +1,8 @@
 Revision history for Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
 
 0.03
-	Handle address not being in parts
+	[ Bug Fixes ]
+	- Handle address not being in parts
 
 0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin
