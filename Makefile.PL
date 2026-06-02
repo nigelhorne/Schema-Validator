@@ -33,13 +33,6 @@ WriteMakefile(
 	EXE_FILES => [ 'bin/extract-event', 'bin/extract-event2', 'bin/validate-schema' ],
 	CONFIGURE_REQUIRES => {
 		'ExtUtils::MakeMaker' => 6.64,	# Minimum version for TEST_REQUIRES
-	}, TEST_REQUIRES => {
-		'FindBin' => 0,
-		'IPC::System::Simple' => 0,
-		'Test::DescribeMe' => 0,
-		'Test::Most' => 0,
-		'Test::Needs' => 0,
-		'Test::RequiresInternet' => 0,
 	}, PREREQ_PM => {
 		'DateTime::Format::ISO8601' => 0,
 		'Email::Valid' => 0,
@@ -47,7 +40,16 @@ WriteMakefile(
 		'LWP::UserAgent' => 0,
 		'JSON::MaybeXS' => 0,
 		'Mojolicious' => 0,           # provides Mojo::DOM used in bin/ scripts
+		'Params::Get' => 0,
+		'Params::Validate::Strict' => 0,
 		'Readonly' => 0,
+	}, TEST_REQUIRES => {
+		'FindBin' => 0,
+		'IPC::System::Simple' => 0,
+		'Test::DescribeMe' => 0,
+		'Test::Most' => 0,
+		'Test::Needs' => 0,
+		'Test::RequiresInternet' => 0,
 	}, dist => $dist,
 	clean		=> { FILES => 'Schema-Validator-*' },
 	# META_ADD => {

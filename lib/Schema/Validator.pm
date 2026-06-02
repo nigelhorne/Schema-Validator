@@ -15,7 +15,7 @@ use Encode                   qw(decode encode);
 use JSON::MaybeXS            qw(decode_json);
 use LWP::UserAgent;
 use Params::Get              qw(get_params);
-use Params::Validate         qw(validate_with SCALAR UNDEF);
+use Params::Validate::Strict         qw(validate_strict);
 use Readonly;
 use Scalar::Util             qw(reftype);
 
@@ -227,16 +227,18 @@ Timezone designators (C<Z>, C<+HH:MM>, C<-HH:MM>) are now accepted.
 
     {
         string => {
-            type     => SCALAR | UNDEF,
-            required => 1,
+            type     => 'string'
+            optional => 1,
         },
     }
 
 =head4 Output (Return::Set)
 
-    RETURN_TYPE  => SCALAR
-    DESCRIPTION  => '1 (valid) or 0 (invalid, undef, or empty input)'
-    CONSTRAINTS  => 'always defined; never throws on undef or empty input'
+    {
+        type => 'boolean'
+        description  => '1 (valid) or 0 (invalid, undef, or empty input)'
+	optional => 0
+    }
 
 =head3 FORMAL SPECIFICATION
 
@@ -281,12 +283,10 @@ Timezone designators (C<Z>, C<+HH:MM>, C<-HH:MM>) are now accepted.
 sub is_valid_datetime {
 	# Accept both positional (is_valid_datetime($s)) and named
 	# (is_valid_datetime(string => $s)) calling conventions.
-	my $p = get_params('string', \@_);
-
 	# Validate: value must be a scalar or undef (undef returns 0 cleanly below).
-	validate_with(
-		params => $p,
-		spec   => { string => { type => SCALAR | UNDEF } },
+	my $p = validate_strict(
+		input => get_params('string', \@_),
+		schema   => { 'string' => { type => 'string', optional => 0 } },
 	);
 
 	my $string = $p->{string};
@@ -461,26 +461,26 @@ unify them.
 =cut
 
 sub load_dynamic_vocabulary {
-	# Accept an optional hash of named overrides: (key => val, ...).
-	# An odd-count @_ would be a caller error; silently ignore it.
-	my %args = (@_ % 2 == 0) ? @_ : ();
+	my $params;
 
 	# Validate types of any supplied overrides (all are optional scalars).
-	validate_with(
-		params => \%args,
-		spec   => {
-			cache_file     => { type => SCALAR, optional => 1 },
-			cache_duration => { type => SCALAR, optional => 1 },
-			vocab_url      => { type => SCALAR, optional => 1 },
-			ua_timeout     => { type => SCALAR, optional => 1 },
-		},
-	);
+	if(scalar(@_)) {
+		$params = validate_strict(
+			input => get_params(undef, \@_),
+			schema   => {
+				cache_file     => { type => 'string', optional => 1 },
+				cache_duration => { type => 'integer', optional => 1 },
+				vocab_url      => { type => 'string', optional => 1 },
+				ua_timeout     => { type => 'integer', optional => 1 },
+			}
+		);
+	}
 
 	# Merge caller overrides with module-level configuration defaults.
-	my $cache_file     = $args{cache_file}     // $config{cache_file};
-	my $cache_duration = $args{cache_duration} // $config{cache_duration};
-	my $vocab_url      = $args{vocab_url}      // $config{vocab_url};
-	my $ua_timeout     = $args{ua_timeout}     // $config{ua_timeout};
+	my $cache_file     = $params->{cache_file}     // $config{cache_file};
+	my $cache_duration = $params->{cache_duration} // $config{cache_duration};
+	my $vocab_url      = $params->{vocab_url}      // $config{vocab_url};
+	my $ua_timeout     = $params->{ua_timeout}     // $config{ua_timeout};
 
 	my $content;
 

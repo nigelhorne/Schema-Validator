@@ -8,6 +8,8 @@ requires 'JSON::MaybeXS';
 requires 'LWP::Protocol::https';
 requires 'LWP::UserAgent';
 requires 'Mojolicious';
+requires 'Params::Get';
+requires 'Params::Validate::Strict';
 requires 'Readonly';
 
 on 'configure' => sub {
