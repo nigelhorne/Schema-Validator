@@ -9,15 +9,16 @@ use strict;
 use warnings;
 use autodie qw(:all);
 
-use Carp                     qw(carp croak);
+use Carp qw(carp croak);
 use DateTime::Format::ISO8601;
-use Encode                   qw(decode encode);
-use JSON::MaybeXS            qw(decode_json);
+use Encode qw(decode encode);
+use File::Spec;
+use JSON::MaybeXS qw(decode_json);
 use LWP::UserAgent;
-use Params::Get              qw(get_params);
-use Params::Validate::Strict         qw(validate_strict);
+use Params::Get qw(get_params);
+use Params::Validate::Strict qw(validate_strict);
 use Readonly;
-use Scalar::Util             qw(reftype);
+use Scalar::Util qw(reftype);
 
 use base 'Exporter';
 
@@ -45,16 +46,22 @@ our %dynamic_properties;
 # are possible without re-opening the Readonly namespace.
 # ---------------------------------------------------------------------------
 
-# Default cache filename -- resolved relative to CWD unless overridden.
+# Default cache directory: $CACHEDIR env var if set, otherwise the system
+# temporary directory.  Evaluated once at module load time.
+Readonly::Scalar my $DEFAULT_CACHE_DIR =>
+	(defined $ENV{CACHEDIR} && length $ENV{CACHEDIR})
+		? $ENV{CACHEDIR}
+		: File::Spec->tmpdir();
+
+# Default cache filename -- stored in $DEFAULT_CACHE_DIR, never in CWD.
 Readonly::Scalar my $DEFAULT_CACHE_FILE =>
-	'schemaorg_dynamic_vocabulary.jsonld';
+	File::Spec->catfile($DEFAULT_CACHE_DIR, 'schemaorg_dynamic_vocabulary.jsonld');
 
 # 86400 == 60 * 60 * 24: cache is considered fresh for one full day.
 Readonly::Scalar my $DEFAULT_CACHE_DURATION => 86_400;
 
 # Canonical URL for the Schema.org full vocabulary in JSON-LD format.
-Readonly::Scalar my $DEFAULT_VOCAB_URL =>
-	'https://schema.org/version/latest/schemaorg-current-https.jsonld';
+Readonly::Scalar my $DEFAULT_VOCAB_URL => 'https://schema.org/version/latest/schemaorg-current-https.jsonld';
 
 # HTTP timeout for the vocabulary download request, in seconds.
 Readonly::Scalar my $DEFAULT_UA_TIMEOUT => 30;
@@ -83,8 +90,6 @@ our %config = (
 # ===========================================================================
 # PUBLIC INTERFACE (POD + code)
 # ===========================================================================
-
-=encoding utf-8
 
 =head1 NAME
 
@@ -133,10 +138,10 @@ definitions as a hashref and via package globals.
 Runtime behaviour is controlled by the package-level C<%Schema::Validator::config>
 hash.  Supported keys and their defaults:
 
-    cache_file     => 'schemaorg_dynamic_vocabulary.jsonld'   # CWD-relative
-    cache_duration => 86400                                   # seconds
+    cache_file     => "$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld"  # or tmpdir
+    cache_duration => 86400                                          # seconds
     vocab_url      => 'https://schema.org/.../schemaorg-current-https.jsonld'
-    ua_timeout     => 30                                      # seconds
+    ua_timeout     => 30                                             # seconds
 
 Override any key before calling an exported function:
 
@@ -242,44 +247,6 @@ Timezone designators (C<Z>, C<+HH:MM>, C<-HH:MM>) are now accepted.
 	optional => 0
     }
 
-=head3 FORMAL SPECIFICATION
-
-    Let CHAR denote the set of all Unicode code points and
-    DIGIT = { c : CHAR | c in {'0'..'9'} }.
-    Let seqN(S) = { s : seq S | #s = N }.
-
-    YEAR     ≜  seqN(4, DIGIT)
-    MONTH    ≜  seqN(2, DIGIT)
-    DAY      ≜  seqN(2, DIGIT)
-    HOUR     ≜  seqN(2, DIGIT)
-    MINUTE   ≜  seqN(2, DIGIT)
-    SECOND   ≜  seqN(2, DIGIT)
-    SEP      ≜  { 'T', ' ' }
-
-    DATE     ≜  { d : seq CHAR | ∃ y ∈ YEAR; mo ∈ MONTH; dy ∈ DAY
-                    • d = y ⌢ ⟨'-'⟩ ⌢ mo ⌢ ⟨'-'⟩ ⌢ dy }
-
-    HHMM     ≜  { t : seq CHAR | ∃ h ∈ HOUR; m ∈ MINUTE
-                    • t = h ⌢ ⟨':'⟩ ⌢ m }
-
-    HHMMSS   ≜  { t : seq CHAR | ∃ h ∈ HOUR; m ∈ MINUTE; s ∈ SECOND
-                    • t = h ⌢ ⟨':'⟩ ⌢ m ⌢ ⟨':'⟩ ⌢ s }
-
-    TIMEFRAG ≜  { tf : seq CHAR | ∃ sep ∈ SEP; hm ∈ (HHMM ∪ HHMMSS)
-                    • tf = ⟨sep⟩ ⌢ hm }
-
-    DATETIME ≜  DATE ∪ { dt : seq CHAR | ∃ d ∈ DATE; tf ∈ TIMEFRAG
-                           • dt = d ⌢ tf }
-
-    ──────────────────────────────────────────────────────────────
-     IsValidDatetime
-    ──────────────────────────────────────────────────────────────
-     str?    : seq CHAR
-     result! : B
-    ──────────────────────────────────────────────────────────────
-     result! ⟺ str? ∈ DATETIME
-    ──────────────────────────────────────────────────────────────
-
 =cut
 
 sub is_valid_datetime {
@@ -326,7 +293,8 @@ All arguments are optional; defaults come from C<%Schema::Validator::config>.
 =over 4
 
 =item * C<cache_file> (optional, scalar) -- path to the local cache file.
-Defaults to C<$config{cache_file}> (CWD-relative).
+Defaults to C<$config{cache_file}>: C<$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld>
+if C<$ENV{CACHEDIR}> is set, otherwise C<File::Spec-E<gt>tmpdir()> is used.
 
 =item * C<cache_duration> (optional, scalar) -- cache validity window in seconds.
 Defaults to C<$config{cache_duration}>.
@@ -369,13 +337,14 @@ parse errors.
 
 =head3 NOTES
 
-The module version of this function stores the cache relative to the process
-CWD.  Set C<$Schema::Validator::config{cache_file}> to an absolute path if
-your application changes directory between calls.
+The default cache directory is determined once at module load time: the
+C<$CACHEDIR> environment variable is used if set; otherwise C<File::Spec-E<gt>tmpdir()>
+is used (typically C</tmp> on Unix).  Override for the session with:
+
+    $Schema::Validator::config{cache_file} = '/my/path/vocab.jsonld';
 
 The C<bin/validate-schema> CLI tool imports this function from the module and
-uses C<cache_file =E<gt> $path> to store its cache under C<~/.cache/schema_validator/>,
-keeping a persistent home-directory cache independent of the process CWD.
+uses C<cache_file =E<gt> $path> to store its cache under C<~/.cache/schema_validator/>.
 
 =head3 EXAMPLE
 
@@ -396,68 +365,20 @@ keeping a persistent home-directory cache independent of the process CWD.
 =head4 Input (Params::Validate::Strict)
 
     {
-        cache_file     => { type => SCALAR, optional => 1 },
-        cache_duration => { type => SCALAR, optional => 1 },
-        vocab_url      => { type => SCALAR, optional => 1 },
-        ua_timeout     => { type => SCALAR, optional => 1 },
+        cache_file     => { type => 'string', optional => 1 },
+        cache_duration => { type => 'string', optional => 1 },
+        vocab_url      => { type => 'string', optional => 1 },
+        ua_timeout     => { type => 'string', optional => 1 },
     }
 
 =head4 Output (Return::Set)
 
-    RETURN_TYPE  => HASHREF
-    DESCRIPTION  => 'class-label => JSON-LD item hashref'
-    ON_FAILURE   => 'empty hashref {}; never throws'
-    SIDE_EFFECTS => 'populates %dynamic_schema and %dynamic_properties'
-
-=head3 FORMAL SPECIFICATION
-
-    Let FILE, DUR, URL be the resolved config values.
-    Let now : N be the current UNIX epoch time.
-    Let mtime : PATH -> N map a path to its last-modification time.
-    Let readable, writeable : PATH -> B be filesystem predicates.
-    Let reachable : URL -> B test HTTP reachability.
-    Let slurp : PATH -> seq CHAR and spit : PATH x seq CHAR -> 1.
-    Let fetch : URL x N -> seq CHAR (second arg is timeout).
-    Let decode_json : seq CHAR -> ITEM.
-    Let label : ITEM -> (LABEL | {}) extract rdfs:label.
-    Let types : ITEM -> P TYPE extract @type values.
-
-    FRESH ≜ ( -e(FILE) ) ∧ ( (now - mtime(FILE)) < DUR )
-
-    ──────────────────────────────────────────────────────────────────────
-     LoadDynamicVocabulary
-    ──────────────────────────────────────────────────────────────────────
-     ΔVocabularyStore
-     cache_file?     : PATH
-     cache_duration? : N
-     vocab_url?      : URL
-     ua_timeout?     : N
-     result!         : CLASS_LABEL ⇸ ITEM
-    ──────────────────────────────────────────────────────────────────────
-     content : seq CHAR
-
-     FRESH ∧ readable(cache_file?)
-         ⇒ content = slurp(cache_file?)
-
-     ¬FRESH ∧ reachable(vocab_url?)
-         ⇒ content = fetch(vocab_url?, ua_timeout?)
-           ∧ ( writeable(cache_file?) ⇒ spit(cache_file?, content) )
-
-     ¬FRESH ∧ ¬reachable(vocab_url?) ∧ -e(cache_file?)
-         ⇒ content = slurp(cache_file?)
-
-     graph ≜ (decode_json content)[AT_GRAPH]
-
-     dynamic_schema' =
-         { item ∈ graph | RDF_CLASS ∈ types(item) ∧ label(item) ≠ ∅
-           • label(item) ↦ item }
-
-     dynamic_properties' =
-         { item ∈ graph | RDF_PROPERTY ∈ types(item) ∧ label(item) ≠ ∅
-           • label(item) ↦ item }
-
-     result! = dynamic_schema'
-    ──────────────────────────────────────────────────────────────────────
+    {
+	type  => 'hashref',
+	description  => 'class-label => JSON-LD item hashref'
+	# ON_FAILURE   => 'empty hashref {}; never throws'
+	# SIDE_EFFECTS => 'populates %dynamic_schema and %dynamic_properties'
+    }
 
 =cut
 
@@ -722,35 +643,16 @@ sub _parse_graph {
 # END OF MODULE POD
 # ===========================================================================
 
-=head1 DEPENDENCIES
-
-=over 4
-
-=item * L<JSON::MaybeXS> -- JSON decoding
-
-=item * L<LWP::UserAgent> -- HTTP client for vocabulary download
-
-=item * L<Params::Get> -- positional/named parameter normalisation
-
-=item * L<Params::Validate> -- runtime parameter type checking
-
-=item * L<Readonly> -- compile-time constants
-
-=item * L<Encode> -- character encoding utilities
-
-=back
-
-Optional: L<Object::Configure> for injecting C<%config> overrides without
-directly modifying the package namespace.
+=encoding utf-8
 
 =head1 FILES
 
 =head2 schemaorg_dynamic_vocabulary.jsonld
 
-Cache file written to the current working directory (or the path specified
-in C<$config{cache_file}>).  Contains the downloaded Schema.org vocabulary
-in JSON-LD format.  Refreshed when older than C<$config{cache_duration}>
-seconds.
+Cache file written to C<$CACHEDIR> (if set) or the system temporary directory
+(C<File::Spec-E<gt>tmpdir()>), unless overridden via C<$config{cache_file}>.
+Contains the downloaded Schema.org vocabulary in JSON-LD format.  Refreshed
+when older than C<$config{cache_duration}> seconds.
 
 =head1 ERROR HANDLING
 
@@ -772,10 +674,6 @@ The module uses C<carp> rather than C<die> for recoverable failures:
 
 =over 4
 
-=item * The CWD-relative cache file path may resolve unexpectedly when the
-calling application changes directory between calls.  Use an absolute path
-via C<$config{cache_file}> to avoid this.
-
 =item * Cache invalidation is time-based only; no checksum or version check.
 
 =back
@@ -791,6 +689,96 @@ via C<$config{cache_file}> to avoid this.
 =head1 REPOSITORY
 
 L<https://github.com/nigelhorne/schema-validator>
+
+=head2 FORMAL SPECIFICATION
+
+=head3 is_valid_datetime
+
+    Let CHAR denote the set of all Unicode code points and
+    DIGIT = { c : CHAR | c in {'0'..'9'} }.
+    Let seqN(S) = { s : seq S | #s = N }.
+
+    YEAR     ≜  seqN(4, DIGIT)
+    MONTH    ≜  seqN(2, DIGIT)
+    DAY      ≜  seqN(2, DIGIT)
+    HOUR     ≜  seqN(2, DIGIT)
+    MINUTE   ≜  seqN(2, DIGIT)
+    SECOND   ≜  seqN(2, DIGIT)
+    SEP      ≜  { 'T', ' ' }
+
+    DATE     ≜  { d : seq CHAR | ∃ y ∈ YEAR; mo ∈ MONTH; dy ∈ DAY
+                    • d = y ⌢ ⟨'-'⟩ ⌢ mo ⌢ ⟨'-'⟩ ⌢ dy }
+
+    HHMM     ≜  { t : seq CHAR | ∃ h ∈ HOUR; m ∈ MINUTE
+                    • t = h ⌢ ⟨':'⟩ ⌢ m }
+
+    HHMMSS   ≜  { t : seq CHAR | ∃ h ∈ HOUR; m ∈ MINUTE; s ∈ SECOND
+                    • t = h ⌢ ⟨':'⟩ ⌢ m ⌢ ⟨':'⟩ ⌢ s }
+
+    TIMEFRAG ≜  { tf : seq CHAR | ∃ sep ∈ SEP; hm ∈ (HHMM ∪ HHMMSS)
+                    • tf = ⟨sep⟩ ⌢ hm }
+
+    DATETIME ≜  DATE ∪ { dt : seq CHAR | ∃ d ∈ DATE; tf ∈ TIMEFRAG
+                           • dt = d ⌢ tf }
+
+    ──────────────────────────────────────────────────────────────
+     IsValidDatetime
+    ──────────────────────────────────────────────────────────────
+     str?    : seq CHAR
+     result! : B
+    ──────────────────────────────────────────────────────────────
+     result! ⟺ str? ∈ DATETIME
+    ──────────────────────────────────────────────────────────────
+
+=head3 load_dynamic_library
+
+    Let FILE, DUR, URL be the resolved config values.
+    Let now : N be the current UNIX epoch time.
+    Let mtime : PATH -> N map a path to its last-modification time.
+    Let readable, writeable : PATH -> B be filesystem predicates.
+    Let reachable : URL -> B test HTTP reachability.
+    Let slurp : PATH -> seq CHAR and spit : PATH x seq CHAR -> 1.
+    Let fetch : URL x N -> seq CHAR (second arg is timeout).
+    Let decode_json : seq CHAR -> ITEM.
+    Let label : ITEM -> (LABEL | {}) extract rdfs:label.
+    Let types : ITEM -> P TYPE extract @type values.
+
+    FRESH ≜ ( -e(FILE) ) ∧ ( (now - mtime(FILE)) < DUR )
+
+    ──────────────────────────────────────────────────────────────────────
+     LoadDynamicVocabulary
+    ──────────────────────────────────────────────────────────────────────
+     ΔVocabularyStore
+     cache_file?     : PATH
+     cache_duration? : N
+     vocab_url?      : URL
+     ua_timeout?     : N
+     result!         : CLASS_LABEL ⇸ ITEM
+    ──────────────────────────────────────────────────────────────────────
+     content : seq CHAR
+
+     FRESH ∧ readable(cache_file?)
+         ⇒ content = slurp(cache_file?)
+
+     ¬FRESH ∧ reachable(vocab_url?)
+         ⇒ content = fetch(vocab_url?, ua_timeout?)
+           ∧ ( writeable(cache_file?) ⇒ spit(cache_file?, content) )
+
+     ¬FRESH ∧ ¬reachable(vocab_url?) ∧ -e(cache_file?)
+         ⇒ content = slurp(cache_file?)
+
+     graph ≜ (decode_json content)[AT_GRAPH]
+
+     dynamic_schema' =
+         { item ∈ graph | RDF_CLASS ∈ types(item) ∧ label(item) ≠ ∅
+           • label(item) ↦ item }
+
+     dynamic_properties' =
+         { item ∈ graph | RDF_PROPERTY ∈ types(item) ∧ label(item) ≠ ∅
+           • label(item) ↦ item }
+
+     result! = dynamic_schema'
+    ──────────────────────────────────────────────────────────────────────
 
 =head1 AUTHOR
 

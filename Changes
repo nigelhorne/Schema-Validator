@@ -18,6 +18,18 @@ Revision history for Schema::Validator - Tools for validating and loading Schema
 	- Fix Integer validation incorrectly accepting decimal numbers (was sharing Number regex)
 	- Fix die list-form in bin/extract-event losing the URL from the error message
 	- Fix bin/extract-event2 die list-form losing the URL from the error message
+	- Fix %config declared as lexical (my); changed to our so callers can override
+	  ua_timeout, cache_file, cache_duration, vocab_url at runtime
+	- Fix default cache_file location: was CWD-relative; now uses $ENV{CACHEDIR}
+	  if set, otherwise File::Spec->tmpdir() (e.g. /tmp), never the process CWD
+	- Fix crash when Schema.org vocabulary JSON is a non-object (e.g. a bare array);
+	  load_dynamic_vocabulary now carps and returns {} instead of dying "Not a HASH reference"
+	- Fix POD for is_valid_datetime: PURPOSE section incorrectly stated timezone offsets
+	  and calendar sanity were not validated; both are enforced via DateTime::Format::ISO8601
+	- Fix POD for load_dynamic_vocabulary: ARGUMENTS spec had optional=>1 for the required
+	  string parameter; corrected to optional=>0
+	- Fix POD NOTES for load_dynamic_vocabulary: stale note claimed bin/validate-schema had
+	  its own independent copy; it now imports from the module
 
 	[ Enhancements ]
 	- Replace is_valid_datetime regex with DateTime::Format::ISO8601; now rejects invalid
@@ -42,6 +54,22 @@ Revision history for Schema::Validator - Tools for validating and loading Schema
 	- Switch bin/extract-event and bin/extract-event2 from JSON to JSON::MaybeXS
 	- Add Email::Valid, Mojolicious, and Readonly to cpanfile prerequisites
 	- Added a test dashboard
+
+	[ Tests ]
+	- Add t/function.t: white-box subtests for every function including internal helpers
+	  (_slurp_file, _spit_file, _fetch_url, _extract_label, _parse_graph) using
+	  Test::Mockingbird; 41 subtests
+	- Add t/unit.t: black-box unit tests per POD API documentation; 33 subtests
+	- Add t/integration.t: end-to-end tests across both public functions with
+	  Test::Mockingbird::Spy verifying external call arguments; 29 subtests
+	- Add t/edge_cases.t: destructive, pathological, boundary, and security subtests
+	  including typeglob inputs, circular references, and upstream failure mocks; 49 subtests
+	- Add t/extended_tests.t: coverage-gap targeted tests achieving >=97% statement coverage;
+	  documents two genuinely unreachable paths; 27 subtests
+	- Add t/mutant_killers.t: mutant-killing tests for all 21 stubs in the generated
+	  xt/mutant_*.t stub; kills BOOL_NEGATE, RETURN_UNDEF, COND_INV, NUM_BOUNDARY mutations
+	  across lines 297-711 using utime-based cache-freshness boundary tests; 27 subtests
+	- Total test suite: 228 subtests across 10 files, all passing under prove -lt
 
 0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin
