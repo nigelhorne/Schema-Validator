@@ -82,8 +82,8 @@ date or datetime formats accepted by Schema.org:
     YYYY-MM-DDTHH:MM:SS      (T separator, with seconds)
     YYYY-MM-DD HH:MM:SS      (space separator, with seconds)
 
-Timezone offsets (`+HH:MM`, `-HH:MM`, `Z`) are **not** validated.
-Calendar sanity (month 99 would pass) is **not** enforced.
+Optional timezone designators (`Z`, `+HH:MM`, `-HH:MM`) are **accepted**.
+Calendar sanity **is** enforced: out-of-range values (e.g. month 99) are **rejected**.
 
 ### ARGUMENTS
 
@@ -132,8 +132,8 @@ Timezone designators (`Z`, `+HH:MM`, `-HH:MM`) are now accepted.
 
     {
         string => {
-            type     => 'string'
-            optional => 1,
+            type     => 'string',
+            optional => 0,
         },
     }
 
@@ -235,10 +235,9 @@ The module version of this function stores the cache relative to the process
 CWD.  Set `$Schema::Validator::config{cache_file}` to an absolute path if
 your application changes directory between calls.
 
-The `bin/validate-schema` CLI tool contains its own independent copy of this
-logic that caches under `~/.cache/schema_validator/`.  The two implementations
-are intentionally separate; refactoring `bin/` to import from here would
-unify them.
+The `bin/validate-schema` CLI tool imports this function from the module and
+uses `cache_file => $path` to store its cache under `~/.cache/schema_validator/`,
+keeping a persistent home-directory cache independent of the process CWD.
 
 ### EXAMPLE
 
