@@ -7,7 +7,7 @@ requires 'Email::Valid';
 requires 'JSON::MaybeXS';
 requires 'LWP::Protocol::https';
 requires 'LWP::UserAgent';
-requires 'Mojolicious';           # provides Mojo::DOM used in bin/ scripts
+requires 'Mojolicious';
 requires 'Readonly';
 
 on 'configure' => sub {
@@ -16,6 +16,7 @@ on 'configure' => sub {
 
 on 'test' => sub {
 	requires 'FindBin';
+	requires 'IPC::System::Simple';
 	requires 'Test::DescribeMe';
 	requires 'Test::Most';
 	requires 'Test::Needs';

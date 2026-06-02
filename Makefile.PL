@@ -35,15 +35,19 @@ WriteMakefile(
 		'ExtUtils::MakeMaker' => 6.64,	# Minimum version for TEST_REQUIRES
 	}, TEST_REQUIRES => {
 		'FindBin' => 0,
+		'IPC::System::Simple' => 0,
 		'Test::DescribeMe' => 0,
 		'Test::Most' => 0,
 		'Test::Needs' => 0,
 		'Test::RequiresInternet' => 0,
 	}, PREREQ_PM => {
 		'DateTime::Format::ISO8601' => 0,
+		'Email::Valid' => 0,
 		'LWP::Protocol::https' => 0,
 		'LWP::UserAgent' => 0,
 		'JSON::MaybeXS' => 0,
+		'Mojolicious' => 0,           # provides Mojo::DOM used in bin/ scripts
+		'Readonly' => 0,
 	}, dist => $dist,
 	clean		=> { FILES => 'Schema-Validator-*' },
 	# META_ADD => {
