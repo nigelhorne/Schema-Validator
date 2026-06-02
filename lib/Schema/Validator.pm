@@ -73,7 +73,7 @@ Readonly::Scalar my $RDFS_LABEL_FULL =>
 # Callers may override any key before calling an exported function, or inject
 # a full replacement via Object::Configure->configure('Schema::Validator', \%h).
 # ---------------------------------------------------------------------------
-my %config = (
+our %config = (
 	cache_file     => $DEFAULT_CACHE_FILE,
 	cache_duration => $DEFAULT_CACHE_DURATION,
 	vocab_url      => $DEFAULT_VOCAB_URL,
