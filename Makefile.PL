@@ -47,6 +47,7 @@ WriteMakefile(
 		'FindBin' => 0,
 		'IPC::System::Simple' => 0,
 		'Test::DescribeMe' => 0,
+		'Test::Memory::Cycle' => 0,
 		'Test::Most' => 0,
 		'Test::Needs' => 0,
 		'Test::RequiresInternet' => 0,

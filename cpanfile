@@ -20,6 +20,7 @@ on 'test' => sub {
 	requires 'FindBin';
 	requires 'IPC::System::Simple';
 	requires 'Test::DescribeMe';
+	requires 'Test::Memory::Cycle';
 	requires 'Test::Most';
 	requires 'Test::Needs';
 	requires 'Test::RequiresInternet';
