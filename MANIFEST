@@ -20,5 +20,6 @@ t/eol.t
 t/extended_tests.t
 t/function.t
 t/integration.t
+t/mutant_killers.t
 t/pod.t
 t/unit.t
