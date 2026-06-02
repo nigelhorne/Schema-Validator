@@ -1,6 +1,6 @@
 Revision history for Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
 
-0.03
+0.03	Tue Jun  2 18:45:25 EDT 2026
 	[ Bug Fixes ]
 	- Handle address not being in parts
 	- Fix mkdir operator-precedence bug that silently ignored directory creation failures

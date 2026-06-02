@@ -25,7 +25,7 @@ use base 'Exporter';
 # Only these two symbols may be imported by callers via 'use ... qw(...)'.
 our @EXPORT_OK = qw(is_valid_datetime load_dynamic_vocabulary);
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 # ---------------------------------------------------------------------------
 # Package globals: both are populated as a side-effect of
@@ -96,7 +96,7 @@ Schema::Validator - Tools for validating and loading Schema.org vocabulary defin
 
 =head1 VERSION
 
-Version 0.02
+Version 0.03
 
 =head1 SYNOPSIS
 

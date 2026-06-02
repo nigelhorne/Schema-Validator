@@ -4,7 +4,7 @@ Schema::Validator - Tools for validating and loading Schema.org vocabulary defin
 
 # VERSION
 
-Version 0.02
+Version 0.03
 
 # SYNOPSIS
 
