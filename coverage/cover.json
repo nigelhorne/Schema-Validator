@@ -4,136 +4,145 @@
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413854.13564,
+         "finish" : 1780417209.28597,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "-e",
-         "start" : 1780413852.55487,
+         "start" : 1780417206.84523,
          "version" : "0.02"
       },
       {
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413852.70014,
+         "finish" : 1780417206.99007,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "-e",
-         "start" : 1780413852.7,
+         "start" : 1780417206.98993,
          "version" : "0.02"
       },
       {
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413853.29117,
+         "finish" : 1780417207.58758,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "t/30-basics.t",
-         "start" : 1780413853.28081,
+         "start" : 1780417207.57688,
          "version" : "0.02"
       },
       {
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413853.6075,
+         "finish" : 1780417207.90907,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "t/eof.t",
-         "start" : 1780413853.60719,
+         "start" : 1780417207.90877,
          "version" : "0.02"
       },
       {
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413853.86344,
+         "finish" : 1780417208.14563,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "t/eol.t",
-         "start" : 1780413853.86313,
+         "start" : 1780417208.14533,
          "version" : "0.02"
       },
       {
          "OS" : "linux",
          "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
          "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
-         "finish" : 1780413854.09617,
+         "finish" : 1780417208.8287,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.4",
+         "run" : "t/function.t",
+         "start" : 1780417208.75511,
+         "version" : "0.02"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1780417209.2457,
          "name" : "Schema-Validator",
          "perl" : "5.40.4",
          "run" : "t/pod.t",
-         "start" : 1780413854.09585,
+         "start" : 1780417209.2454,
          "version" : "0.02"
       }
    ],
    "summary" : {
       "Total" : {
          "branch" : {
-            "covered" : 4,
-            "error" : 42,
-            "percentage" : 8.69565217391305,
+            "covered" : 40,
+            "error" : 6,
+            "percentage" : 86.9565217391304,
             "total" : 46,
             "uncoverable" : 0
          },
          "condition" : {
-            "covered" : 3,
-            "error" : 27,
-            "percentage" : 10,
+            "covered" : 17,
+            "error" : 13,
+            "percentage" : 56.6666666666667,
             "total" : 30,
             "uncoverable" : 0
          },
          "statement" : {
-            "covered" : 45,
-            "error" : 86,
-            "percentage" : 34.3511450381679,
+            "covered" : 130,
+            "error" : 1,
+            "percentage" : 99.236641221374,
             "total" : 131
          },
          "subroutine" : {
-            "covered" : 14,
-            "error" : 6,
-            "percentage" : 70,
+            "covered" : 20,
+            "percentage" : 100,
             "total" : 20
          },
          "total" : {
-            "covered" : 66,
-            "error" : 161,
-            "percentage" : 29.0748898678414,
+            "covered" : 207,
+            "error" : 20,
+            "percentage" : 91.1894273127753,
             "total" : 227,
             "uncoverable" : 0
          }
       },
       "lib/Schema/Validator.pm" : {
          "branch" : {
-            "covered" : 4,
-            "error" : 42,
-            "percentage" : 8.69565217391305,
+            "covered" : 40,
+            "error" : 6,
+            "percentage" : 86.9565217391304,
             "total" : 46,
             "uncoverable" : 0
          },
          "condition" : {
-            "covered" : 3,
-            "error" : 27,
-            "percentage" : 10,
+            "covered" : 17,
+            "error" : 13,
+            "percentage" : 56.6666666666667,
             "total" : 30,
             "uncoverable" : 0
          },
          "statement" : {
-            "covered" : 45,
-            "error" : 86,
-            "percentage" : 34.3511450381679,
+            "covered" : 130,
+            "error" : 1,
+            "percentage" : 99.236641221374,
             "total" : 131
          },
          "subroutine" : {
-            "covered" : 14,
-            "error" : 6,
-            "percentage" : 70,
+            "covered" : 20,
+            "percentage" : 100,
             "total" : 20
          },
          "total" : {
-            "covered" : 66,
-            "error" : 161,
-            "percentage" : 29.0748898678414,
+            "covered" : 207,
+            "error" : 20,
+            "percentage" : 91.1894273127753,
             "total" : 227,
             "uncoverable" : 0
          }
