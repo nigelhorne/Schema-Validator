@@ -359,6 +359,10 @@ calling application changes directory between calls.  Use an absolute path
 via `$config{cache_file}` to avoid this.
 - Cache invalidation is time-based only; no checksum or version check.
 
+# SEE ALSO
+
+- [Test Dashboard](https://nigelhorne.github.io/Schema-Validator/coverage/)
+
 # REPOSITORY
 
 [https://github.com/nigelhorne/schema-validator](https://github.com/nigelhorne/schema-validator)
@@ -369,7 +373,7 @@ Nigel Horne, `<njh at nigelhorne.com>`
 
 # LICENCE AND COPYRIGHT
 
-Copyright 2025 Nigel Horne.
+Copyright 2025-2026 Nigel Horne.
 
 Usage is subject to the GPL2 licence terms.
 If you use it,
