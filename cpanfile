@@ -2,6 +2,7 @@
 
 requires 'perl', '5.008';
 
+requires 'DateTime::Format::ISO8601';
 requires 'JSON::MaybeXS';
 requires 'LWP::Protocol::https';
 requires 'LWP::UserAgent';
