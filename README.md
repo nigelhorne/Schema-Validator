@@ -232,8 +232,6 @@ Nigel Horne, `<njh at nigelhorne.com>`
 file permissions or multiple concurrent processes
 - No timezone support in datetime validation
 - Cache invalidation is time-based only; no checksums or version checking
-- Network failures during vocabulary download return empty results rather than using
-stale cache
 
 # SEE ALSO
 
@@ -251,7 +249,7 @@ This module is provided as-is without any warranty.
 
 # LICENCE AND COPYRIGHT
 
-Copyright 2025 Nigel Horne.
+Copyright 2025-2026 Nigel Horne.
 
 Usage is subject to licence terms.
 

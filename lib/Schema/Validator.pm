@@ -419,7 +419,7 @@ This module is provided as-is without any warranty.
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright 2025 Nigel Horne.
+Copyright 2025-2026 Nigel Horne.
 
 Usage is subject to licence terms.
 
