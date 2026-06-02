@@ -317,7 +317,7 @@ Approximate LCSAJ segments: 49<br>
 </span><span class="">   25: # Only these two symbols may be imported by callers via &#39;use ... qw(...)&#39;.
 </span><span class="">   26: our @EXPORT_OK = qw(is_valid_datetime load_dynamic_vocabulary);
 </span><span class="">   27: 
-</span><span class="">   28: our $VERSION = &#39;0.02&#39;;
+</span><span class="">   28: our $VERSION = &#39;0.03&#39;;
 </span><span class="">   29: 
 </span><span class="">   30: # ---------------------------------------------------------------------------
 </span><span class="">   31: # Package globals: both are populated as a side-effect of
@@ -388,7 +388,7 @@ Approximate LCSAJ segments: 49<br>
 </span><span class="">   96: 
 </span><span class="">   97: =head1 VERSION
 </span><span class="">   98: 
-</span><span class="">   99: Version 0.02
+</span><span class="">   99: Version 0.03
 </span><span class="">  100: 
 </span><span class="">  101: =head1 SYNOPSIS
 </span><span class="">  102: 
@@ -551,14 +551,12 @@ Approximate LCSAJ segments: 49<br>
 </span><span class="">  259: 	my $string = $p-&gt;{string};
 </span><span class="">  260: 
 </span><span class="">  261: 	# Treat undef or empty string as invalid without throwing.
-</span><span class="">  262: 	return 0 unless defined $string &amp;&amp; length $string;
-</span><span class="">  263: 
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  264: 	# Normalise the space-separator variant to T before handing off to the
+</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  262: 	return 0 unless defined $string &amp;&amp; length $string;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_264_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_262_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -566,7 +564,7 @@ Approximate LCSAJ segments: 49<br>
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_264_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_262_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -575,7 +573,9 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  265: 	# module, which requires strict ISO 8601 (T separator only).
+<span class="">  263: 
+</span><span class="">  264: 	# Normalise the space-separator variant to T before handing off to the
+</span><span class="">  265: 	# module, which requires strict ISO 8601 (T separator only).
 </span><span class="">  266: 	(my $normalised = $string) =~ s/^(\d{4}-\d{2}-\d{2}) (?=\d{2}:)/$1T/;
 </span><span class="">  267: 
 </span><span class="">  268: 	# Delegate to DateTime::Format::ISO8601 for full semantic validation;
@@ -697,16 +697,16 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">384 → 387 → 400</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">384 → 387 → 0</span></span>  384: 	my $params;
 </span><span class="">  385: 
 </span><span class="">  386: 	# Validate types of any supplied overrides (all are optional scalars).
-</span><span class="">  387: 	if(scalar(@_)) {
-</span><span class="">  388: 		$params = validate_strict(
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  389: 			input =&gt; get_params(undef, \@_),
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  387: 	if(scalar(@_)) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_389_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_387_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  390: 			schema   =&gt; {
+<span class="">  388: 		$params = validate_strict(
+</span><span class="">  389: 			input =&gt; get_params(undef, \@_),
+</span><span class="">  390: 			schema   =&gt; {
 </span><span class="">  391: 				cache_file     =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
 </span><span class="">  392: 				cache_duration =&gt; { type =&gt; &#39;integer&#39;, optional =&gt; 1 },
 </span><span class="">  393: 				vocab_url      =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
@@ -725,14 +725,12 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  406: 
 </span><span class="">  407: 	# Attempt to read a fresh cache file.  Open directly to avoid the TOCTOU
 </span><span class="">  408: 	# race that would exist between a separate -e test and the open call.
-</span><span class="">  409: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
-</span><span class="">  410: 		eval { $content = _slurp_file($cache_file) };
-</span><span class="survived-3 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch. Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one).">  411: 		carp &quot;Could not read cache &#39;$cache_file&#39;: $@&quot; if $@;
+</span><span class="survived-3 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch. Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one).">  409: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 4, Killed: 0, Survived: 4)</summary>
 					<ul>
-				<li><b>NUM_BOUNDARY_411_55_>: Numeric boundary flip < to ></b><br>HIGH: Likely missing edge-case test (boundary value)
+				<li><b>NUM_BOUNDARY_409_55_>: Numeric boundary flip < to ></b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -740,7 +738,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_411_55_<=: Numeric boundary flip < to <=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_409_55_<=: Numeric boundary flip < to <=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -748,7 +746,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_411_55_>=: Numeric boundary flip < to >=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_409_55_>=: Numeric boundary flip < to >=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -756,105 +754,107 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>COND_INV_411_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+							</li><li><b>COND_INV_409_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  412: 	}
+<span class="">  410: 		eval { $content = _slurp_file($cache_file) };
+</span><span class="">  411: 		carp &quot;Could not read cache &#39;$cache_file&#39;: $@&quot; if $@;
+</span><span class="">  412: 	}
 </span><span class="">  413: 
 </span><span class="">  414: 	# If no usable content yet, try to download the vocabulary.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 436</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 0</span></span>  415: 	unless (defined $content) {
-</span><span class="">  416: 		$content = _fetch_url($vocab_url, $ua_timeout);
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  417: 
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 436</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 0</span></span>  415: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_417_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_415_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  418: 		if (defined $content) {
-</span><span class="">  419: 			# Persist the download to the cache (best-effort; warn, do not die).
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  420: 			eval { _spit_file($cache_file, $content) };
+<span class="">  416: 		$content = _fetch_url($vocab_url, $ua_timeout);
+</span><span class="">  417: 
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  418: 		if (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_420_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_418_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  421: 			carp &quot;Could not write cache &#39;$cache_file&#39;: $@&quot; if $@;
+<span class="">  419: 			# Persist the download to the cache (best-effort; warn, do not die).
+</span><span class="">  420: 			eval { _spit_file($cache_file, $content) };
+</span><span class="">  421: 			carp &quot;Could not write cache &#39;$cache_file&#39;: $@&quot; if $@;
 </span><span class="">  422: 		} else {
 </span><span class="">  423: 			# Network failed; fall back to a stale cache if one exists.
-</span><span class="">  424: 			if (-e $cache_file) {
-</span><span class="">  425: 				eval { $content = _slurp_file($cache_file) };
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  424: 			if (-e $cache_file) {
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
+					<ul>
+				<li><b>COND_INV_424_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  425: 				eval { $content = _slurp_file($cache_file) };
 </span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  426: 				if ($@) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_426_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_426_5: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
 <span class="">  427: 					carp &quot;Could not read stale cache &#39;$cache_file&#39;: $@&quot;;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  428: 				} else {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_428_5: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  429: 					carp &quot;Network unavailable; using stale cache &#39;$cache_file&#39;&quot;;
+</span><span class="">  428: 				} else {
+</span><span class="">  429: 					carp &quot;Network unavailable; using stale cache &#39;$cache_file&#39;&quot;;
 </span><span class="">  430: 				}
 </span><span class="">  431: 			}
 </span><span class="">  432: 		}
 </span><span class="">  433: 	}
 </span><span class="">  434: 
 </span><span class="">  435: 	# All content-acquisition strategies failed; return empty result.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 442</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 0</span></span>  436: 	unless (defined $content) {
-</span><span class="">  437: 		carp &#39;load_dynamic_vocabulary: no vocabulary content available&#39;;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  438: 		return {};
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 442</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 0</span></span>  436: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_438_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_436_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  439: 	}
+<span class="">  437: 		carp &#39;load_dynamic_vocabulary: no vocabulary content available&#39;;
+</span><span class="">  438: 		return {};
+</span><span class="">  439: 	}
 </span><span class="">  440: 
 </span><span class="">  441: 	# Parse the JSON; treat errors as non-fatal warnings.
 </span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">442 → 443 → 451</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">442 → 443 → 0</span></span>  442: 	my $data = eval { decode_json($content) };
-</span><span class="">  443: 	if ($@) {
-</span><span class="">  444: 		carp &quot;Failed to parse vocabulary JSON: $@&quot;;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  445: 		return {};
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  443: 	if ($@) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_445_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_443_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  446: 	}
+<span class="">  444: 		carp &quot;Failed to parse vocabulary JSON: $@&quot;;
+</span><span class="">  445: 		return {};
+</span><span class="">  446: 	}
 </span><span class="">  447: 
 </span><span class="">  448: 	# Guard against decode_json returning a non-object (e.g. a JSON array,
 </span><span class="">  449: 	# a bare number, or any other non-hash type).  Calling exists on a
 </span><span class="">  450: 	# non-hashref dies; catching it here keeps the &quot;never throws&quot; contract.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 457</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 0</span></span>  451: 	unless (ref($data) eq &#39;HASH&#39;) {
-</span><span class="">  452: 		carp &quot;Vocabulary JSON is not a JSON object&quot;;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  453: 		return {};
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 457</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 0</span></span>  451: 	unless (ref($data) eq &#39;HASH&#39;) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_453_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_451_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  454: 	}
+<span class="">  452: 		carp &quot;Vocabulary JSON is not a JSON object&quot;;
+</span><span class="">  453: 		return {};
+</span><span class="">  454: 	}
 </span><span class="">  455: 
 </span><span class="">  456: 	# Confirm the expected JSON-LD graph structure is present.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 463</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 0</span></span>  457: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
-</span><span class="">  458: 		carp &quot;Vocabulary JSON is missing the &#39;\@graph&#39; array&quot;;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  459: 		return {};
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 463</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 0</span></span>  457: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_459_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_457_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  460: 	}
+<span class="">  458: 		carp &quot;Vocabulary JSON is missing the &#39;\@graph&#39; array&quot;;
+</span><span class="">  459: 		return {};
+</span><span class="">  460: 	}
 </span><span class="">  461: 
 </span><span class="">  462: 	# Delegate parsing to the internal graph processor.
 </span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">463 → 477 → 0</span></span>  463: 	my ($classes, $props) = _parse_graph($data-&gt;{$AT_GRAPH});
@@ -871,14 +871,12 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  474: 	);
 </span><span class="">  475: 
 </span><span class="">  476: 	# Return the class hashref; callers needing properties use the global.
-</span><span class="">  477: 	return $classes;
-</span><span class="">  478: }
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  479: 
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  477: 	return $classes;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_479_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_477_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -886,7 +884,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_479_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_477_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -895,7 +893,9 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  480: # ===========================================================================
+<span class="">  478: }
+</span><span class="">  479: 
+</span><span class="">  480: # ===========================================================================
 </span><span class="">  481: # INTERNAL HELPERS
 </span><span class="">  482: # All routines below begin with _ and are not part of the public API.
 </span><span class="">  483: # ===========================================================================
@@ -921,14 +921,12 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  503: 	my $content = &lt;$fh&gt;;
 </span><span class="">  504: 
 </span><span class="">  505: 	close $fh;
-</span><span class="">  506: 	return $content;
-</span><span class="">  507: }
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  508: 
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  506: 	return $content;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_508_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_506_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -936,7 +934,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_508_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_506_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -945,7 +943,9 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  509: # ---------------------------------------------------------------------------
+<span class="">  507: }
+</span><span class="">  508: 
+</span><span class="">  509: # ---------------------------------------------------------------------------
 </span><span class="">  510: # _spit_file($path, $content)
 </span><span class="">  511: #
 </span><span class="">  512: # Purpose:  Write a scalar string to a file, creating or truncating it.
@@ -963,14 +963,12 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  524: 	print $fh $content;
 </span><span class="">  525: 	close $fh;
 </span><span class="">  526: 
-</span><span class="">  527: 	return 1;
-</span><span class="">  528: }
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  529: 
+</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  527: 	return 1;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_529_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_527_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -978,7 +976,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_529_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_527_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -987,7 +985,9 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  530: # ---------------------------------------------------------------------------
+<span class="">  528: }
+</span><span class="">  529: 
+</span><span class="">  530: # ---------------------------------------------------------------------------
 </span><span class="">  531: # _fetch_url($url, $timeout)
 </span><span class="">  532: #
 </span><span class="">  533: # Purpose:  Perform an HTTP GET and return the decoded response body.
@@ -1007,25 +1007,23 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  547: 	my $res = $ua-&gt;get($url);
 </span><span class="">  548: 
 </span><span class="">  549: 	# Treat any non-2xx status as a soft failure so callers can try fallbacks.
-</span><span class="">  550: 	unless ($res-&gt;is_success) {
-</span><span class="">  551: 		carp &quot;Failed to fetch &#39;$url&#39;: &quot;, $res-&gt;status_line;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  552: 		return;
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  550: 	unless ($res-&gt;is_success) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_552_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_550_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  553: 	}
+<span class="">  551: 		carp &quot;Failed to fetch &#39;$url&#39;: &quot;, $res-&gt;status_line;
+</span><span class="">  552: 		return;
+</span><span class="">  553: 	}
 </span><span class="">  554: 
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">555 → 555 → 0</span></span>  555: 	return $res-&gt;decoded_content;
-</span><span class="">  556: }
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  557: 
+</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">555 → 555 → 0</span></span>  555: 	return $res-&gt;decoded_content;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_557_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_555_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -1033,7 +1031,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_557_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_555_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -1042,7 +1040,9 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  558: # ---------------------------------------------------------------------------
+<span class="">  556: }
+</span><span class="">  557: 
+</span><span class="">  558: # ---------------------------------------------------------------------------
 </span><span class="">  559: # _extract_label($item)
 </span><span class="">  560: #
 </span><span class="">  561: # Purpose:  Extract the rdfs:label string from a JSON-LD graph item hashref.
@@ -1099,49 +1099,49 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  612: 		my $label = _extract_label($item) or next;
 </span><span class="">  613: 
 </span><span class="">  614: 		# Index rdfs:Class items under their label and their @id short name.
-</span><span class="">  615: 		if (grep { $_ eq $RDF_CLASS } @types) {
-</span><span class="">  616: 			$classes{$label} = $item;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  617: 
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  615: 		if (grep { $_ eq $RDF_CLASS } @types) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_617_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_615_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  618: 			# Secondary index by short URI fragment (e.g. &#39;MusicGroup&#39;).
-</span><span class="">  619: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
-</span><span class="">  620: 				(my $short = $id) =~ s{.*/}{};
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  621: 				$classes{$short} //= $item;
+<span class="">  616: 			$classes{$label} = $item;
+</span><span class="">  617: 
+</span><span class="">  618: 			# Secondary index by short URI fragment (e.g. &#39;MusicGroup&#39;).
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  619: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_621_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_619_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  622: 			}
+<span class="">  620: 				(my $short = $id) =~ s{.*/}{};
+</span><span class="">  621: 				$classes{$short} //= $item;
+</span><span class="">  622: 			}
 </span><span class="">  623: 		}
 </span><span class="">  624: 
 </span><span class="">  625: 		# Index rdf:Property items under their label and @id short name.
-</span><span class="">  626: 		if (grep { $_ eq $RDF_PROPERTY } @types) {
-</span><span class="">  627: 			$props{$label} = $item;
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  628: 
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  626: 		if (grep { $_ eq $RDF_PROPERTY } @types) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_628_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_626_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  629: 			# Secondary index by short URI fragment (e.g. &#39;startDate&#39;).
-</span><span class="">  630: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
-</span><span class="">  631: 				(my $short = $id) =~ s{.*/}{};
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  632: 				$props{$short} //= $item;
+<span class="">  627: 			$props{$label} = $item;
+</span><span class="">  628: 
+</span><span class="">  629: 			# Secondary index by short URI fragment (e.g. &#39;startDate&#39;).
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  630: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_632_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_630_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  633: 			}
+<span class="">  631: 				(my $short = $id) =~ s{.*/}{};
+</span><span class="">  632: 				$props{$short} //= $item;
+</span><span class="">  633: 			}
 </span><span class="">  634: 		}
 </span><span class="">  635: 	}
 </span><span class="">  636: 
