@@ -40,6 +40,7 @@ WriteMakefile(
 		'Test::Needs' => 0,
 		'Test::RequiresInternet' => 0,
 	}, PREREQ_PM => {
+		'DateTime::Format::ISO8601' => 0,
 		'LWP::Protocol::https' => 0,
 		'LWP::UserAgent' => 0,
 		'JSON::MaybeXS' => 0,
