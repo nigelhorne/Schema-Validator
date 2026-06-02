@@ -24,6 +24,7 @@ on 'test' => sub {
 	requires 'Test::Most';
 	requires 'Test::Needs';
 	requires 'Test::RequiresInternet';
+	requires 'Test::Returns';
 };
 
 on 'develop' => sub {
