@@ -3,9 +3,12 @@
 requires 'perl', '5.008';
 
 requires 'DateTime::Format::ISO8601';
+requires 'Email::Valid';
 requires 'JSON::MaybeXS';
 requires 'LWP::Protocol::https';
 requires 'LWP::UserAgent';
+requires 'Mojolicious';           # provides Mojo::DOM used in bin/ scripts
+requires 'Readonly';
 
 on 'configure' => sub {
 	requires 'ExtUtils::MakeMaker', '6.64';

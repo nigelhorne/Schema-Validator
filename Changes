@@ -13,6 +13,34 @@ Revision history for Schema::Validator - Tools for validating and loading Schema
 	- Fix addressCountry static enum to use ISO 3166-1 alpha-2 codes (was mixed underscore strings)
 	- Fix Boolean property validation to accept JSON::PP::Boolean objects (decoded true/false)
 	- Fix country code validation to accept ISO 3166-1 alpha-3 codes (e.g. USA) as well as alpha-2
+	- Fix startDate property_validations key casing (was lowercase 'startdate', never matched JSON-LD)
+	- Fix SARIF uri field being undef when reading from STDIN; now defaults to '-'
+	- Fix Integer validation incorrectly accepting decimal numbers (was sharing Number regex)
+	- Fix die list-form in bin/extract-event losing the URL from the error message
+	- Fix bin/extract-event2 die list-form losing the URL from the error message
+
+	[ Enhancements ]
+	- Replace is_valid_datetime regex with DateTime::Format::ISO8601; now rejects invalid
+	  calendar values (e.g. month 99) and accepts timezone designators (Z, +HH:MM)
+	- Replace email validation regex in validate_property_format with Email::Valid
+	- Replace DateTime type-branch regex in validate_property_format with is_valid_iso8601,
+	  consistent with the adjacent Date branch
+	- Replace Number validation regex with Scalar::Util::looks_like_number (was imported
+	  but unused); Integer now validated separately with a strict /^\d+$/ pattern
+	- Replace JSON-LD extraction regex in bin/extract-event with Mojo::DOM CSS selector,
+	  handling CDATA sections and unusual attribute ordering
+	- Replace HTML::TreeBuilder and JSON-LD extraction regex in bin/extract-event2 with
+	  Mojo::DOM throughout; removes the HTML::TreeBuilder dependency
+	- Hoist validate-schema exit-code map to file-level Readonly::Hash; was rebuilt on
+	  every push_validation call
+	- Add property-name Readonly constants to validate-schema; removes magic strings
+	  from the static schema rules table
+	- Import is_valid_datetime and load_dynamic_vocabulary from Schema::Validator module
+	  into bin/validate-schema; removes ~160 lines of duplicated code
+	- Add _organizer_field helper to bin/extract-event; removes duplicated organizer
+	  array/object extraction logic
+	- Switch bin/extract-event and bin/extract-event2 from JSON to JSON::MaybeXS
+	- Add Email::Valid, Mojolicious, and Readonly to cpanfile prerequisites
 
 0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin
