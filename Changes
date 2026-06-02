@@ -41,6 +41,7 @@ Revision history for Schema::Validator - Tools for validating and loading Schema
 	  array/object extraction logic
 	- Switch bin/extract-event and bin/extract-event2 from JSON to JSON::MaybeXS
 	- Add Email::Valid, Mojolicious, and Readonly to cpanfile prerequisites
+	- Added a test dashboard
 
 0.02	Fri Dec 12 11:01:38 EST 2025
 	Install the bin

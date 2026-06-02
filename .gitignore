@@ -34,4 +34,5 @@ inc/
 /pm_to_blib
 /*.zip
 *.swp
-.DS_Store
+TODO
+CLAUDE.md
