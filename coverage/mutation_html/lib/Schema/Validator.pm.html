@@ -301,297 +301,264 @@ Approximate LCSAJ segments: 49<br>
 </span><span class="">    9: use warnings;
 </span><span class="">   10: use autodie qw(:all);
 </span><span class="">   11: 
-</span><span class="">   12: use Carp                     qw(carp croak);
+</span><span class="">   12: use Carp qw(carp croak);
 </span><span class="">   13: use DateTime::Format::ISO8601;
-</span><span class="">   14: use Encode                   qw(decode encode);
-</span><span class="">   15: use JSON::MaybeXS            qw(decode_json);
-</span><span class="">   16: use LWP::UserAgent;
-</span><span class="">   17: use Params::Get              qw(get_params);
-</span><span class="">   18: use Params::Validate::Strict         qw(validate_strict);
-</span><span class="">   19: use Readonly;
-</span><span class="">   20: use Scalar::Util             qw(reftype);
-</span><span class="">   21: 
-</span><span class="">   22: use base &#39;Exporter&#39;;
-</span><span class="">   23: 
-</span><span class="">   24: # Only these two symbols may be imported by callers via &#39;use ... qw(...)&#39;.
-</span><span class="">   25: our @EXPORT_OK = qw(is_valid_datetime load_dynamic_vocabulary);
-</span><span class="">   26: 
-</span><span class="">   27: our $VERSION = &#39;0.02&#39;;
-</span><span class="">   28: 
-</span><span class="">   29: # ---------------------------------------------------------------------------
-</span><span class="">   30: # Package globals: both are populated as a side-effect of
-</span><span class="">   31: # load_dynamic_vocabulary().  Callers may read them after that call.
-</span><span class="">   32: # ---------------------------------------------------------------------------
-</span><span class="">   33: 
-</span><span class="">   34: # rdfs:Class items from the Schema.org JSON-LD graph, keyed by class label
-</span><span class="">   35: our %dynamic_schema;
-</span><span class="">   36: 
-</span><span class="">   37: # rdf:Property items from the Schema.org JSON-LD graph, keyed by property label
-</span><span class="">   38: our %dynamic_properties;
-</span><span class="">   39: 
-</span><span class="">   40: # ===========================================================================
-</span><span class="">   41: # CONSTANTS
-</span><span class="">   42: # ===========================================================================
-</span><span class="">   43: # All magic strings and numbers are confined here; nothing below uses bare
-</span><span class="">   44: # literals.  Every constant mirrors a key in %config so runtime overrides
-</span><span class="">   45: # are possible without re-opening the Readonly namespace.
-</span><span class="">   46: # ---------------------------------------------------------------------------
-</span><span class="">   47: 
-</span><span class="">   48: # Default cache filename -- resolved relative to CWD unless overridden.
-</span><span class="">   49: Readonly::Scalar my $DEFAULT_CACHE_FILE =&gt;
-</span><span class="">   50: 	&#39;schemaorg_dynamic_vocabulary.jsonld&#39;;
-</span><span class="">   51: 
-</span><span class="">   52: # 86400 == 60 * 60 * 24: cache is considered fresh for one full day.
-</span><span class="">   53: Readonly::Scalar my $DEFAULT_CACHE_DURATION =&gt; 86_400;
-</span><span class="">   54: 
-</span><span class="">   55: # Canonical URL for the Schema.org full vocabulary in JSON-LD format.
-</span><span class="">   56: Readonly::Scalar my $DEFAULT_VOCAB_URL =&gt;
-</span><span class="">   57: 	&#39;https://schema.org/version/latest/schemaorg-current-https.jsonld&#39;;
-</span><span class="">   58: 
-</span><span class="">   59: # HTTP timeout for the vocabulary download request, in seconds.
-</span><span class="">   60: Readonly::Scalar my $DEFAULT_UA_TIMEOUT =&gt; 30;
-</span><span class="">   61: 
-</span><span class="">   62: # JSON-LD structural keys and RDF type labels used when traversing @graph.
-</span><span class="">   63: Readonly::Scalar my $AT_GRAPH        =&gt; &#39;@graph&#39;;
-</span><span class="">   64: Readonly::Scalar my $RDF_CLASS       =&gt; &#39;rdfs:Class&#39;;
-</span><span class="">   65: Readonly::Scalar my $RDF_PROPERTY    =&gt; &#39;rdf:Property&#39;;
-</span><span class="">   66: Readonly::Scalar my $RDFS_LABEL      =&gt; &#39;rdfs:label&#39;;
-</span><span class="">   67: Readonly::Scalar my $RDFS_LABEL_FULL =&gt;
-</span><span class="">   68: 	&#39;http://www.w3.org/2000/01/rdf-schema#label&#39;;
-</span><span class="">   69: 
-</span><span class="">   70: # ===========================================================================
-</span><span class="">   71: # CONFIGURATION
-</span><span class="">   72: # ===========================================================================
-</span><span class="">   73: # Callers may override any key before calling an exported function, or inject
-</span><span class="">   74: # a full replacement via Object::Configure-&gt;configure(&#39;Schema::Validator&#39;, \%h).
-</span><span class="">   75: # ---------------------------------------------------------------------------
-</span><span class="">   76: our %config = (
-</span><span class="">   77: 	cache_file     =&gt; $DEFAULT_CACHE_FILE,
-</span><span class="">   78: 	cache_duration =&gt; $DEFAULT_CACHE_DURATION,
-</span><span class="">   79: 	vocab_url      =&gt; $DEFAULT_VOCAB_URL,
-</span><span class="">   80: 	ua_timeout     =&gt; $DEFAULT_UA_TIMEOUT,
-</span><span class="">   81: );
-</span><span class="">   82: 
-</span><span class="">   83: # ===========================================================================
-</span><span class="">   84: # PUBLIC INTERFACE (POD + code)
-</span><span class="">   85: # ===========================================================================
-</span><span class="">   86: 
-</span><span class="">   87: =encoding utf-8
-</span><span class="">   88: 
-</span><span class="">   89: =head1 NAME
-</span><span class="">   90: 
-</span><span class="">   91: Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
-</span><span class="">   92: 
-</span><span class="">   93: =head1 VERSION
-</span><span class="">   94: 
-</span><span class="">   95: Version 0.02
-</span><span class="">   96: 
-</span><span class="">   97: =head1 SYNOPSIS
-</span><span class="">   98: 
-</span><span class="">   99:     use Schema::Validator qw(is_valid_datetime load_dynamic_vocabulary);
-</span><span class="">  100: 
-</span><span class="">  101:     # Validate a date or datetime string
-</span><span class="">  102:     if (is_valid_datetime(&#39;2024-11-14&#39;)) {
-</span><span class="">  103:         print &quot;Valid date\n&quot;;
-</span><span class="">  104:     }
+</span><span class="">   14: use Encode qw(decode encode);
+</span><span class="">   15: use File::Spec;
+</span><span class="">   16: use JSON::MaybeXS qw(decode_json);
+</span><span class="">   17: use LWP::UserAgent;
+</span><span class="">   18: use Params::Get qw(get_params);
+</span><span class="">   19: use Params::Validate::Strict qw(validate_strict);
+</span><span class="">   20: use Readonly;
+</span><span class="">   21: use Scalar::Util qw(reftype);
+</span><span class="">   22: 
+</span><span class="">   23: use base &#39;Exporter&#39;;
+</span><span class="">   24: 
+</span><span class="">   25: # Only these two symbols may be imported by callers via &#39;use ... qw(...)&#39;.
+</span><span class="">   26: our @EXPORT_OK = qw(is_valid_datetime load_dynamic_vocabulary);
+</span><span class="">   27: 
+</span><span class="">   28: our $VERSION = &#39;0.02&#39;;
+</span><span class="">   29: 
+</span><span class="">   30: # ---------------------------------------------------------------------------
+</span><span class="">   31: # Package globals: both are populated as a side-effect of
+</span><span class="">   32: # load_dynamic_vocabulary().  Callers may read them after that call.
+</span><span class="">   33: # ---------------------------------------------------------------------------
+</span><span class="">   34: 
+</span><span class="">   35: # rdfs:Class items from the Schema.org JSON-LD graph, keyed by class label
+</span><span class="">   36: our %dynamic_schema;
+</span><span class="">   37: 
+</span><span class="">   38: # rdf:Property items from the Schema.org JSON-LD graph, keyed by property label
+</span><span class="">   39: our %dynamic_properties;
+</span><span class="">   40: 
+</span><span class="">   41: # ===========================================================================
+</span><span class="">   42: # CONSTANTS
+</span><span class="">   43: # ===========================================================================
+</span><span class="">   44: # All magic strings and numbers are confined here; nothing below uses bare
+</span><span class="">   45: # literals.  Every constant mirrors a key in %config so runtime overrides
+</span><span class="">   46: # are possible without re-opening the Readonly namespace.
+</span><span class="">   47: # ---------------------------------------------------------------------------
+</span><span class="">   48: 
+</span><span class="">   49: # Default cache directory: $CACHEDIR env var if set, otherwise the system
+</span><span class="">   50: # temporary directory.  Evaluated once at module load time.
+</span><span class="">   51: Readonly::Scalar my $DEFAULT_CACHE_DIR =&gt;
+</span><span class="">   52: 	(defined $ENV{CACHEDIR} &amp;&amp; length $ENV{CACHEDIR})
+</span><span class="">   53: 		? $ENV{CACHEDIR}
+</span><span class="">   54: 		: File::Spec-&gt;tmpdir();
+</span><span class="">   55: 
+</span><span class="">   56: # Default cache filename -- stored in $DEFAULT_CACHE_DIR, never in CWD.
+</span><span class="">   57: Readonly::Scalar my $DEFAULT_CACHE_FILE =&gt;
+</span><span class="">   58: 	File::Spec-&gt;catfile($DEFAULT_CACHE_DIR, &#39;schemaorg_dynamic_vocabulary.jsonld&#39;);
+</span><span class="">   59: 
+</span><span class="">   60: # 86400 == 60 * 60 * 24: cache is considered fresh for one full day.
+</span><span class="">   61: Readonly::Scalar my $DEFAULT_CACHE_DURATION =&gt; 86_400;
+</span><span class="">   62: 
+</span><span class="">   63: # Canonical URL for the Schema.org full vocabulary in JSON-LD format.
+</span><span class="">   64: Readonly::Scalar my $DEFAULT_VOCAB_URL =&gt; &#39;https://schema.org/version/latest/schemaorg-current-https.jsonld&#39;;
+</span><span class="">   65: 
+</span><span class="">   66: # HTTP timeout for the vocabulary download request, in seconds.
+</span><span class="">   67: Readonly::Scalar my $DEFAULT_UA_TIMEOUT =&gt; 30;
+</span><span class="">   68: 
+</span><span class="">   69: # JSON-LD structural keys and RDF type labels used when traversing @graph.
+</span><span class="">   70: Readonly::Scalar my $AT_GRAPH        =&gt; &#39;@graph&#39;;
+</span><span class="">   71: Readonly::Scalar my $RDF_CLASS       =&gt; &#39;rdfs:Class&#39;;
+</span><span class="">   72: Readonly::Scalar my $RDF_PROPERTY    =&gt; &#39;rdf:Property&#39;;
+</span><span class="">   73: Readonly::Scalar my $RDFS_LABEL      =&gt; &#39;rdfs:label&#39;;
+</span><span class="">   74: Readonly::Scalar my $RDFS_LABEL_FULL =&gt;
+</span><span class="">   75: 	&#39;http://www.w3.org/2000/01/rdf-schema#label&#39;;
+</span><span class="">   76: 
+</span><span class="">   77: # ===========================================================================
+</span><span class="">   78: # CONFIGURATION
+</span><span class="">   79: # ===========================================================================
+</span><span class="">   80: # Callers may override any key before calling an exported function, or inject
+</span><span class="">   81: # a full replacement via Object::Configure-&gt;configure(&#39;Schema::Validator&#39;, \%h).
+</span><span class="">   82: # ---------------------------------------------------------------------------
+</span><span class="">   83: our %config = (
+</span><span class="">   84: 	cache_file     =&gt; $DEFAULT_CACHE_FILE,
+</span><span class="">   85: 	cache_duration =&gt; $DEFAULT_CACHE_DURATION,
+</span><span class="">   86: 	vocab_url      =&gt; $DEFAULT_VOCAB_URL,
+</span><span class="">   87: 	ua_timeout     =&gt; $DEFAULT_UA_TIMEOUT,
+</span><span class="">   88: );
+</span><span class="">   89: 
+</span><span class="">   90: # ===========================================================================
+</span><span class="">   91: # PUBLIC INTERFACE (POD + code)
+</span><span class="">   92: # ===========================================================================
+</span><span class="">   93: 
+</span><span class="">   94: =head1 NAME
+</span><span class="">   95: 
+</span><span class="">   96: Schema::Validator - Tools for validating and loading Schema.org vocabulary definitions
+</span><span class="">   97: 
+</span><span class="">   98: =head1 VERSION
+</span><span class="">   99: 
+</span><span class="">  100: Version 0.02
+</span><span class="">  101: 
+</span><span class="">  102: =head1 SYNOPSIS
+</span><span class="">  103: 
+</span><span class="">  104:     use Schema::Validator qw(is_valid_datetime load_dynamic_vocabulary);
 </span><span class="">  105: 
-</span><span class="">  106:     # Load and query the Schema.org vocabulary
-</span><span class="">  107:     my $classes = load_dynamic_vocabulary();
-</span><span class="">  108:     if (exists $classes-&gt;{&#39;Person&#39;}) {
-</span><span class="">  109:         print &quot;Person class is defined\n&quot;;
-</span><span class="">  110:     }
-</span><span class="">  111: 
-</span><span class="">  112:     # Override a config value for a single call
-</span><span class="">  113:     my $classes = load_dynamic_vocabulary(ua_timeout =&gt; 60);
-</span><span class="">  114: 
-</span><span class="">  115: =head1 DESCRIPTION
+</span><span class="">  106:     # Validate a date or datetime string
+</span><span class="">  107:     if (is_valid_datetime(&#39;2024-11-14&#39;)) {
+</span><span class="">  108:         print &quot;Valid date\n&quot;;
+</span><span class="">  109:     }
+</span><span class="">  110: 
+</span><span class="">  111:     # Load and query the Schema.org vocabulary
+</span><span class="">  112:     my $classes = load_dynamic_vocabulary();
+</span><span class="">  113:     if (exists $classes-&gt;{&#39;Person&#39;}) {
+</span><span class="">  114:         print &quot;Person class is defined\n&quot;;
+</span><span class="">  115:     }
 </span><span class="">  116: 
-</span><span class="">  117: C&lt;Schema::Validator&gt; provides two utilities for working with Schema.org
-</span><span class="">  118: structured data:
+</span><span class="">  117:     # Override a config value for a single call
+</span><span class="">  118:     my $classes = load_dynamic_vocabulary(ua_timeout =&gt; 60);
 </span><span class="">  119: 
-</span><span class="">  120: =over 4
+</span><span class="">  120: =head1 DESCRIPTION
 </span><span class="">  121: 
-</span><span class="">  122: =item * L&lt;/is_valid_datetime&gt; -- validates a string against the ISO 8601
-</span><span class="">  123: date/datetime subset used by Schema.org.
+</span><span class="">  122: C&lt;Schema::Validator&gt; provides two utilities for working with Schema.org
+</span><span class="">  123: structured data:
 </span><span class="">  124: 
-</span><span class="">  125: =item * L&lt;/load_dynamic_vocabulary&gt; -- downloads (and caches for 24 hours)
-</span><span class="">  126: the full Schema.org JSON-LD vocabulary and exposes all class and property
-</span><span class="">  127: definitions as a hashref and via package globals.
-</span><span class="">  128: 
-</span><span class="">  129: =back
-</span><span class="">  130: 
-</span><span class="">  131: =head2 Configuration
-</span><span class="">  132: 
-</span><span class="">  133: Runtime behaviour is controlled by the package-level C&lt;%Schema::Validator::config&gt;
-</span><span class="">  134: hash.  Supported keys and their defaults:
+</span><span class="">  125: =over 4
+</span><span class="">  126: 
+</span><span class="">  127: =item * L&lt;/is_valid_datetime&gt; -- validates a string against the ISO 8601
+</span><span class="">  128: date/datetime subset used by Schema.org.
+</span><span class="">  129: 
+</span><span class="">  130: =item * L&lt;/load_dynamic_vocabulary&gt; -- downloads (and caches for 24 hours)
+</span><span class="">  131: the full Schema.org JSON-LD vocabulary and exposes all class and property
+</span><span class="">  132: definitions as a hashref and via package globals.
+</span><span class="">  133: 
+</span><span class="">  134: =back
 </span><span class="">  135: 
-</span><span class="">  136:     cache_file     =&gt; &#39;schemaorg_dynamic_vocabulary.jsonld&#39;   # CWD-relative
-</span><span class="">  137:     cache_duration =&gt; 86400                                   # seconds
-</span><span class="">  138:     vocab_url      =&gt; &#39;https://schema.org/.../schemaorg-current-https.jsonld&#39;
-</span><span class="">  139:     ua_timeout     =&gt; 30                                      # seconds
+</span><span class="">  136: =head2 Configuration
+</span><span class="">  137: 
+</span><span class="">  138: Runtime behaviour is controlled by the package-level C&lt;%Schema::Validator::config&gt;
+</span><span class="">  139: hash.  Supported keys and their defaults:
 </span><span class="">  140: 
-</span><span class="">  141: Override any key before calling an exported function:
-</span><span class="">  142: 
-</span><span class="">  143:     $Schema::Validator::config{ua_timeout} = 60;
-</span><span class="">  144: 
-</span><span class="">  145: Or supply a complete replacement via L&lt;Object::Configure&gt;:
-</span><span class="">  146: 
-</span><span class="">  147:     Object::Configure-&gt;configure(&#39;Schema::Validator&#39;, \%my_config);
-</span><span class="">  148: 
-</span><span class="">  149: =head1 PACKAGE VARIABLES
-</span><span class="">  150: 
-</span><span class="">  151: =head2 %dynamic_schema
-</span><span class="">  152: 
-</span><span class="">  153: Package hash keyed by Schema.org class label (e.g. C&lt;Person&gt;, C&lt;Event&gt;).
-</span><span class="">  154: Values are the raw item hashrefs from the JSON-LD C&lt;@graph&gt; array.
-</span><span class="">  155: Populated as a side-effect of L&lt;/load_dynamic_vocabulary&gt;.
-</span><span class="">  156: 
-</span><span class="">  157: =head2 %dynamic_properties
-</span><span class="">  158: 
-</span><span class="">  159: Package hash keyed by Schema.org property label (e.g. C&lt;name&gt;, C&lt;startDate&gt;).
-</span><span class="">  160: Values are the raw item hashrefs from the JSON-LD C&lt;@graph&gt; array.
-</span><span class="">  161: Populated as a side-effect of L&lt;/load_dynamic_vocabulary&gt;.
-</span><span class="">  162: 
-</span><span class="">  163: =head1 FUNCTIONS
-</span><span class="">  164: 
-</span><span class="">  165: =head2 is_valid_datetime
-</span><span class="">  166: 
-</span><span class="">  167: =head3 PURPOSE
-</span><span class="">  168: 
-</span><span class="">  169: Tests whether a scalar string conforms to one of the ISO 8601
-</span><span class="">  170: date or datetime formats accepted by Schema.org:
+</span><span class="">  141:     cache_file     =&gt; &quot;$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld&quot;  # or tmpdir
+</span><span class="">  142:     cache_duration =&gt; 86400                                          # seconds
+</span><span class="">  143:     vocab_url      =&gt; &#39;https://schema.org/.../schemaorg-current-https.jsonld&#39;
+</span><span class="">  144:     ua_timeout     =&gt; 30                                             # seconds
+</span><span class="">  145: 
+</span><span class="">  146: Override any key before calling an exported function:
+</span><span class="">  147: 
+</span><span class="">  148:     $Schema::Validator::config{ua_timeout} = 60;
+</span><span class="">  149: 
+</span><span class="">  150: Or supply a complete replacement via L&lt;Object::Configure&gt;:
+</span><span class="">  151: 
+</span><span class="">  152:     Object::Configure-&gt;configure(&#39;Schema::Validator&#39;, \%my_config);
+</span><span class="">  153: 
+</span><span class="">  154: =head1 PACKAGE VARIABLES
+</span><span class="">  155: 
+</span><span class="">  156: =head2 %dynamic_schema
+</span><span class="">  157: 
+</span><span class="">  158: Package hash keyed by Schema.org class label (e.g. C&lt;Person&gt;, C&lt;Event&gt;).
+</span><span class="">  159: Values are the raw item hashrefs from the JSON-LD C&lt;@graph&gt; array.
+</span><span class="">  160: Populated as a side-effect of L&lt;/load_dynamic_vocabulary&gt;.
+</span><span class="">  161: 
+</span><span class="">  162: =head2 %dynamic_properties
+</span><span class="">  163: 
+</span><span class="">  164: Package hash keyed by Schema.org property label (e.g. C&lt;name&gt;, C&lt;startDate&gt;).
+</span><span class="">  165: Values are the raw item hashrefs from the JSON-LD C&lt;@graph&gt; array.
+</span><span class="">  166: Populated as a side-effect of L&lt;/load_dynamic_vocabulary&gt;.
+</span><span class="">  167: 
+</span><span class="">  168: =head1 FUNCTIONS
+</span><span class="">  169: 
+</span><span class="">  170: =head2 is_valid_datetime
 </span><span class="">  171: 
-</span><span class="">  172:     YYYY-MM-DD               (date only)
-</span><span class="">  173:     YYYY-MM-DDTHH:MM         (T separator, no seconds)
-</span><span class="">  174:     YYYY-MM-DD HH:MM         (space separator, no seconds)
-</span><span class="">  175:     YYYY-MM-DDTHH:MM:SS      (T separator, with seconds)
-</span><span class="">  176:     YYYY-MM-DD HH:MM:SS      (space separator, with seconds)
-</span><span class="">  177: 
-</span><span class="">  178: Optional timezone designators (C&lt;Z&gt;, C&lt;+HH:MM&gt;, C&lt;-HH:MM&gt;) are B&lt;accepted&gt;.
-</span><span class="">  179: Calendar sanity B&lt;is&gt; enforced: out-of-range values (e.g. month 99) are B&lt;rejected&gt;.
-</span><span class="">  180: 
-</span><span class="">  181: =head3 ARGUMENTS
+</span><span class="">  172: =head3 PURPOSE
+</span><span class="">  173: 
+</span><span class="">  174: Tests whether a scalar string conforms to one of the ISO 8601
+</span><span class="">  175: date or datetime formats accepted by Schema.org:
+</span><span class="">  176: 
+</span><span class="">  177:     YYYY-MM-DD               (date only)
+</span><span class="">  178:     YYYY-MM-DDTHH:MM         (T separator, no seconds)
+</span><span class="">  179:     YYYY-MM-DD HH:MM         (space separator, no seconds)
+</span><span class="">  180:     YYYY-MM-DDTHH:MM:SS      (T separator, with seconds)
+</span><span class="">  181:     YYYY-MM-DD HH:MM:SS      (space separator, with seconds)
 </span><span class="">  182: 
-</span><span class="">  183: =over 4
-</span><span class="">  184: 
-</span><span class="">  185: =item * C&lt;string&gt; (required, scalar) -- the candidate string to test.
-</span><span class="">  186: Both positional (C&lt;is_valid_datetime(&#39;2024-11-14&#39;)&gt;) and named
-</span><span class="">  187: (C&lt;is_valid_datetime(string =E&lt;gt&gt; &#39;2024-11-14&#39;)&gt;) calling conventions
-</span><span class="">  188: are accepted.
+</span><span class="">  183: Optional timezone designators (C&lt;Z&gt;, C&lt;+HH:MM&gt;, C&lt;-HH:MM&gt;) are B&lt;accepted&gt;.
+</span><span class="">  184: Calendar sanity B&lt;is&gt; enforced: out-of-range values (e.g. month 99) are B&lt;rejected&gt;.
+</span><span class="">  185: 
+</span><span class="">  186: =head3 ARGUMENTS
+</span><span class="">  187: 
+</span><span class="">  188: =over 4
 </span><span class="">  189: 
-</span><span class="">  190: =back
-</span><span class="">  191: 
-</span><span class="">  192: =head3 RETURNS
-</span><span class="">  193: 
-</span><span class="">  194: C&lt;1&gt; if the string is in a supported format; C&lt;0&gt; otherwise.
-</span><span class="">  195: Returns C&lt;0&gt; for C&lt;undef&gt; or an empty string without throwing.
+</span><span class="">  190: =item * C&lt;string&gt; (required, scalar) -- the candidate string to test.
+</span><span class="">  191: Both positional (C&lt;is_valid_datetime(&#39;2024-11-14&#39;)&gt;) and named
+</span><span class="">  192: (C&lt;is_valid_datetime(string =E&lt;gt&gt; &#39;2024-11-14&#39;)&gt;) calling conventions
+</span><span class="">  193: are accepted.
+</span><span class="">  194: 
+</span><span class="">  195: =back
 </span><span class="">  196: 
-</span><span class="">  197: =head3 SIDE EFFECTS
+</span><span class="">  197: =head3 RETURNS
 </span><span class="">  198: 
-</span><span class="">  199: None.
-</span><span class="">  200: 
-</span><span class="">  201: =head3 NOTES
-</span><span class="">  202: 
-</span><span class="">  203: Delegates to C&lt;DateTime::Format::ISO8601-&gt;parse_datetime()&gt; for semantic
-</span><span class="">  204: validation, so out-of-range values (e.g. month 99) are rejected.
-</span><span class="">  205: The space-separator variant (C&lt;YYYY-MM-DD HH:MM&gt;) is normalised to a T
-</span><span class="">  206: separator before parsing since the module requires strict ISO 8601.
-</span><span class="">  207: Timezone designators (C&lt;Z&gt;, C&lt;+HH:MM&gt;, C&lt;-HH:MM&gt;) are now accepted.
-</span><span class="">  208: 
-</span><span class="">  209: =head3 EXAMPLE
-</span><span class="">  210: 
-</span><span class="">  211:     use Schema::Validator qw(is_valid_datetime);
-</span><span class="">  212: 
-</span><span class="">  213:     is_valid_datetime(&#39;2024-11-14&#39;);                 # 1
-</span><span class="">  214:     is_valid_datetime(&#39;2024-11-14T15:30:00&#39;);        # 1
-</span><span class="">  215:     is_valid_datetime(&#39;2024-11-14 15:30&#39;);           # 1  (space sep normalised)
-</span><span class="">  216:     is_valid_datetime(&#39;2024-11-14T15:30:00Z&#39;);       # 1  (UTC timezone)
-</span><span class="">  217:     is_valid_datetime(&#39;2024-11-14T15:30:00+01:00&#39;);  # 1  (offset timezone)
-</span><span class="">  218:     is_valid_datetime(&#39;2024-99-01&#39;);                 # 0  (invalid month)
-</span><span class="">  219:     is_valid_datetime(&#39;28/06/2025&#39;);                 # 0
-</span><span class="">  220:     is_valid_datetime(undef);                        # 0  (no exception)
-</span><span class="">  221:     is_valid_datetime(&#39;&#39;);                           # 0  (no exception)
-</span><span class="">  222: 
-</span><span class="">  223:     # Named calling convention
-</span><span class="">  224:     is_valid_datetime(string =&gt; &#39;2024-11-14&#39;);       # 1
-</span><span class="">  225: 
-</span><span class="">  226: =head3 API SPECIFICATION
+</span><span class="">  199: C&lt;1&gt; if the string is in a supported format; C&lt;0&gt; otherwise.
+</span><span class="">  200: Returns C&lt;0&gt; for C&lt;undef&gt; or an empty string without throwing.
+</span><span class="">  201: 
+</span><span class="">  202: =head3 SIDE EFFECTS
+</span><span class="">  203: 
+</span><span class="">  204: None.
+</span><span class="">  205: 
+</span><span class="">  206: =head3 NOTES
+</span><span class="">  207: 
+</span><span class="">  208: Delegates to C&lt;DateTime::Format::ISO8601-&gt;parse_datetime()&gt; for semantic
+</span><span class="">  209: validation, so out-of-range values (e.g. month 99) are rejected.
+</span><span class="">  210: The space-separator variant (C&lt;YYYY-MM-DD HH:MM&gt;) is normalised to a T
+</span><span class="">  211: separator before parsing since the module requires strict ISO 8601.
+</span><span class="">  212: Timezone designators (C&lt;Z&gt;, C&lt;+HH:MM&gt;, C&lt;-HH:MM&gt;) are now accepted.
+</span><span class="">  213: 
+</span><span class="">  214: =head3 EXAMPLE
+</span><span class="">  215: 
+</span><span class="">  216:     use Schema::Validator qw(is_valid_datetime);
+</span><span class="">  217: 
+</span><span class="">  218:     is_valid_datetime(&#39;2024-11-14&#39;);                 # 1
+</span><span class="">  219:     is_valid_datetime(&#39;2024-11-14T15:30:00&#39;);        # 1
+</span><span class="">  220:     is_valid_datetime(&#39;2024-11-14 15:30&#39;);           # 1  (space sep normalised)
+</span><span class="">  221:     is_valid_datetime(&#39;2024-11-14T15:30:00Z&#39;);       # 1  (UTC timezone)
+</span><span class="">  222:     is_valid_datetime(&#39;2024-11-14T15:30:00+01:00&#39;);  # 1  (offset timezone)
+</span><span class="">  223:     is_valid_datetime(&#39;2024-99-01&#39;);                 # 0  (invalid month)
+</span><span class="">  224:     is_valid_datetime(&#39;28/06/2025&#39;);                 # 0
+</span><span class="">  225:     is_valid_datetime(undef);                        # 0  (no exception)
+</span><span class="">  226:     is_valid_datetime(&#39;&#39;);                           # 0  (no exception)
 </span><span class="">  227: 
-</span><span class="">  228: =head4 Input (Params::Validate::Strict)
-</span><span class="">  229: 
-</span><span class="">  230:     {
-</span><span class="">  231:         string =&gt; {
-</span><span class="">  232:             type     =&gt; &#39;string&#39;,
-</span><span class="">  233:             optional =&gt; 0,
-</span><span class="">  234:         },
-</span><span class="">  235:     }
-</span><span class="">  236: 
-</span><span class="">  237: =head4 Output (Return::Set)
-</span><span class="">  238: 
-</span><span class="">  239:     {
-</span><span class="">  240:         type =&gt; &#39;boolean&#39;
-</span><span class="">  241:         description  =&gt; &#39;1 (valid) or 0 (invalid, undef, or empty input)&#39;
-</span><span class="">  242: 	optional =&gt; 0
-</span><span class="">  243:     }
-</span><span class="">  244: 
-</span><span class="">  245: =head3 FORMAL SPECIFICATION
-</span><span class="">  246: 
-</span><span class="">  247:     Let CHAR denote the set of all Unicode code points and
-</span><span class="">  248:     DIGIT = { c : CHAR | c in {&#39;0&#39;..&#39;9&#39;} }.
-</span><span class="">  249:     Let seqN(S) = { s : seq S | #s = N }.
-</span><span class="">  250: 
-</span><span class="">  251:     YEAR     &acirc;&#137;&#156;  seqN(4, DIGIT)
-</span><span class="">  252:     MONTH    &acirc;&#137;&#156;  seqN(2, DIGIT)
-</span><span class="">  253:     DAY      &acirc;&#137;&#156;  seqN(2, DIGIT)
-</span><span class="">  254:     HOUR     &acirc;&#137;&#156;  seqN(2, DIGIT)
-</span><span class="">  255:     MINUTE   &acirc;&#137;&#156;  seqN(2, DIGIT)
-</span><span class="">  256:     SECOND   &acirc;&#137;&#156;  seqN(2, DIGIT)
-</span><span class="">  257:     SEP      &acirc;&#137;&#156;  { &#39;T&#39;, &#39; &#39; }
-</span><span class="">  258: 
-</span><span class="">  259:     DATE     &acirc;&#137;&#156;  { d : seq CHAR | &acirc;&#136;&#131; y &acirc;&#136;&#136; YEAR; mo &acirc;&#136;&#136; MONTH; dy &acirc;&#136;&#136; DAY
-</span><span class="">  260:                     &acirc;&#128;&cent; d = y &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;-&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; mo &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;-&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; dy }
-</span><span class="">  261: 
-</span><span class="">  262:     HHMM     &acirc;&#137;&#156;  { t : seq CHAR | &acirc;&#136;&#131; h &acirc;&#136;&#136; HOUR; m &acirc;&#136;&#136; MINUTE
-</span><span class="">  263:                     &acirc;&#128;&cent; t = h &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; m }
-</span><span class="">  264: 
-</span><span class="">  265:     HHMMSS   &acirc;&#137;&#156;  { t : seq CHAR | &acirc;&#136;&#131; h &acirc;&#136;&#136; HOUR; m &acirc;&#136;&#136; MINUTE; s &acirc;&#136;&#136; SECOND
-</span><span class="">  266:                     &acirc;&#128;&cent; t = h &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; m &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; s }
-</span><span class="">  267: 
-</span><span class="">  268:     TIMEFRAG &acirc;&#137;&#156;  { tf : seq CHAR | &acirc;&#136;&#131; sep &acirc;&#136;&#136; SEP; hm &acirc;&#136;&#136; (HHMM &acirc;&#136;&ordf; HHMMSS)
-</span><span class="">  269:                     &acirc;&#128;&cent; tf = &acirc;&#159;&uml;sep&acirc;&#159;&copy; &acirc;&#140;&cent; hm }
-</span><span class="">  270: 
-</span><span class="">  271:     DATETIME &acirc;&#137;&#156;  DATE &acirc;&#136;&ordf; { dt : seq CHAR | &acirc;&#136;&#131; d &acirc;&#136;&#136; DATE; tf &acirc;&#136;&#136; TIMEFRAG
-</span><span class="">  272:                            &acirc;&#128;&cent; dt = d &acirc;&#140;&cent; tf }
-</span><span class="">  273: 
-</span><span class="">  274:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  275:      IsValidDatetime
-</span><span class="">  276:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  277:      str?    : seq CHAR
-</span><span class="">  278:      result! : B
-</span><span class="">  279:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  280:      result! &acirc;&#159;&ordm; str? &acirc;&#136;&#136; DATETIME
-</span><span class="">  281:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  282: 
-</span><span class="">  283: =cut
-</span><span class="">  284: 
-</span><span class="">  285: sub is_valid_datetime {
-</span><span class="">  286: 	# Accept both positional (is_valid_datetime($s)) and named
-</span><span class="">  287: 	# (is_valid_datetime(string =&gt; $s)) calling conventions.
-</span><span class="">  288: 	# Validate: value must be a scalar or undef (undef returns 0 cleanly below).
-</span><span class="">  289: 	my $p = validate_strict(
-</span><span class="">  290: 		input =&gt; get_params(&#39;string&#39;, \@_),
-</span><span class="">  291: 		schema   =&gt; { &#39;string&#39; =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 0 } },
-</span><span class="">  292: 	);
-</span><span class="">  293: 
-</span><span class="">  294: 	my $string = $p-&gt;{string};
-</span><span class="">  295: 
-</span><span class="">  296: 	# Treat undef or empty string as invalid without throwing.
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  297: 	return 0 unless defined $string &amp;&amp; length $string;
+</span><span class="">  228:     # Named calling convention
+</span><span class="">  229:     is_valid_datetime(string =&gt; &#39;2024-11-14&#39;);       # 1
+</span><span class="">  230: 
+</span><span class="">  231: =head3 API SPECIFICATION
+</span><span class="">  232: 
+</span><span class="">  233: =head4 Input (Params::Validate::Strict)
+</span><span class="">  234: 
+</span><span class="">  235:     {
+</span><span class="">  236:         string =&gt; {
+</span><span class="">  237:             type     =&gt; &#39;string&#39;,
+</span><span class="">  238:             optional =&gt; 0,
+</span><span class="">  239:         },
+</span><span class="">  240:     }
+</span><span class="">  241: 
+</span><span class="">  242: =head4 Output (Return::Set)
+</span><span class="">  243: 
+</span><span class="">  244:     {
+</span><span class="">  245:         type =&gt; &#39;boolean&#39;
+</span><span class="">  246:         description  =&gt; &#39;1 (valid) or 0 (invalid, undef, or empty input)&#39;
+</span><span class="">  247: 	optional =&gt; 0
+</span><span class="">  248:     }
+</span><span class="">  249: 
+</span><span class="">  250: =cut
+</span><span class="">  251: 
+</span><span class="">  252: sub is_valid_datetime {
+</span><span class="">  253: 	# Accept both positional (is_valid_datetime($s)) and named
+</span><span class="">  254: 	# (is_valid_datetime(string =&gt; $s)) calling conventions.
+</span><span class="">  255: 	# Validate: value must be a scalar or undef (undef returns 0 cleanly below).
+</span><span class="">  256: 	my $p = validate_strict(
+</span><span class="">  257: 		input =&gt; get_params(&#39;string&#39;, \@_),
+</span><span class="">  258: 		schema   =&gt; { &#39;string&#39; =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 0 } },
+</span><span class="">  259: 	);
+</span><span class="">  260: 
+</span><span class="">  261: 	my $string = $p-&gt;{string};
+</span><span class="">  262: 
+</span><span class="">  263: 	# Treat undef or empty string as invalid without throwing.
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  264: 	return 0 unless defined $string &amp;&amp; length $string;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_297_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_264_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -599,7 +566,7 @@ Approximate LCSAJ segments: 49<br>
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_297_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_264_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -608,210 +575,164 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  298: 
-</span><span class="">  299: 	# Normalise the space-separator variant to T before handing off to the
-</span><span class="">  300: 	# module, which requires strict ISO 8601 (T separator only).
-</span><span class="">  301: 	(my $normalised = $string) =~ s/^(\d{4}-\d{2}-\d{2}) (?=\d{2}:)/$1T/;
-</span><span class="">  302: 
-</span><span class="">  303: 	# Delegate to DateTime::Format::ISO8601 for full semantic validation;
-</span><span class="">  304: 	# a truthy (DateTime) object means valid, undef/$@ means invalid.
-</span><span class="">  305: 	return eval { DateTime::Format::ISO8601-&gt;parse_datetime($normalised) } ? 1 : 0;
-</span><span class="">  306: }
+<span class="">  265: 
+</span><span class="">  266: 	# Normalise the space-separator variant to T before handing off to the
+</span><span class="">  267: 	# module, which requires strict ISO 8601 (T separator only).
+</span><span class="">  268: 	(my $normalised = $string) =~ s/^(\d{4}-\d{2}-\d{2}) (?=\d{2}:)/$1T/;
+</span><span class="">  269: 
+</span><span class="">  270: 	# Delegate to DateTime::Format::ISO8601 for full semantic validation;
+</span><span class="">  271: 	# a truthy (DateTime) object means valid, undef/$@ means invalid.
+</span><span class="">  272: 	return eval { DateTime::Format::ISO8601-&gt;parse_datetime($normalised) } ? 1 : 0;
+</span><span class="">  273: }
+</span><span class="">  274: 
+</span><span class="">  275: # ===========================================================================
+</span><span class="">  276: 
+</span><span class="">  277: =head2 load_dynamic_vocabulary
+</span><span class="">  278: 
+</span><span class="">  279: =head3 PURPOSE
+</span><span class="">  280: 
+</span><span class="">  281: Downloads the complete Schema.org vocabulary from the official JSON-LD
+</span><span class="">  282: endpoint, parses it into class and property lookup tables, caches the raw
+</span><span class="">  283: JSON-LD locally, and returns the class table as a hashref.
+</span><span class="">  284: 
+</span><span class="">  285: The cache is considered fresh for C&lt;cache_duration&gt; seconds (default 24 hours).
+</span><span class="">  286: On network failure the function falls back to a stale cache rather than
+</span><span class="">  287: returning an empty result, and emits a C&lt;carp&gt; warning.
+</span><span class="">  288: 
+</span><span class="">  289: =head3 ARGUMENTS
+</span><span class="">  290: 
+</span><span class="">  291: All arguments are optional; defaults come from C&lt;%Schema::Validator::config&gt;.
+</span><span class="">  292: 
+</span><span class="">  293: =over 4
+</span><span class="">  294: 
+</span><span class="">  295: =item * C&lt;cache_file&gt; (optional, scalar) -- path to the local cache file.
+</span><span class="">  296: Defaults to C&lt;$config{cache_file}&gt;: C&lt;$CACHEDIR/schemaorg_dynamic_vocabulary.jsonld&gt;
+</span><span class="">  297: if C&lt;$ENV{CACHEDIR}&gt; is set, otherwise C&lt;File::Spec-E&lt;gt&gt;tmpdir()&gt; is used.
+</span><span class="">  298: 
+</span><span class="">  299: =item * C&lt;cache_duration&gt; (optional, scalar) -- cache validity window in seconds.
+</span><span class="">  300: Defaults to C&lt;$config{cache_duration}&gt;.
+</span><span class="">  301: 
+</span><span class="">  302: =item * C&lt;vocab_url&gt; (optional, scalar) -- URL of the JSON-LD vocabulary endpoint.
+</span><span class="">  303: Defaults to C&lt;$config{vocab_url}&gt;.
+</span><span class="">  304: 
+</span><span class="">  305: =item * C&lt;ua_timeout&gt; (optional, scalar) -- LWP::UserAgent timeout in seconds.
+</span><span class="">  306: Defaults to C&lt;$config{ua_timeout}&gt;.
 </span><span class="">  307: 
-</span><span class="">  308: # ===========================================================================
+</span><span class="">  308: =back
 </span><span class="">  309: 
-</span><span class="">  310: =head2 load_dynamic_vocabulary
+</span><span class="">  310: Both zero-argument and named calling conventions are supported:
 </span><span class="">  311: 
-</span><span class="">  312: =head3 PURPOSE
-</span><span class="">  313: 
-</span><span class="">  314: Downloads the complete Schema.org vocabulary from the official JSON-LD
-</span><span class="">  315: endpoint, parses it into class and property lookup tables, caches the raw
-</span><span class="">  316: JSON-LD locally, and returns the class table as a hashref.
-</span><span class="">  317: 
-</span><span class="">  318: The cache is considered fresh for C&lt;cache_duration&gt; seconds (default 24 hours).
-</span><span class="">  319: On network failure the function falls back to a stale cache rather than
-</span><span class="">  320: returning an empty result, and emits a C&lt;carp&gt; warning.
-</span><span class="">  321: 
-</span><span class="">  322: =head3 ARGUMENTS
-</span><span class="">  323: 
-</span><span class="">  324: All arguments are optional; defaults come from C&lt;%Schema::Validator::config&gt;.
-</span><span class="">  325: 
-</span><span class="">  326: =over 4
-</span><span class="">  327: 
-</span><span class="">  328: =item * C&lt;cache_file&gt; (optional, scalar) -- path to the local cache file.
-</span><span class="">  329: Defaults to C&lt;$config{cache_file}&gt; (CWD-relative).
+</span><span class="">  312:     load_dynamic_vocabulary();
+</span><span class="">  313:     load_dynamic_vocabulary(ua_timeout =&gt; 60);
+</span><span class="">  314: 
+</span><span class="">  315: =head3 RETURNS
+</span><span class="">  316: 
+</span><span class="">  317: A hashref mapping class labels (e.g. C&lt;&#39;Person&#39;&gt;) to their raw JSON-LD
+</span><span class="">  318: definition hashrefs from the C&lt;@graph&gt; array.
+</span><span class="">  319: 
+</span><span class="">  320: Returns an empty hashref C&lt;{}&gt; on all failure paths (network unreachable,
+</span><span class="">  321: no cache, JSON parse error).  Never throws.
+</span><span class="">  322: 
+</span><span class="">  323: =head3 SIDE EFFECTS
+</span><span class="">  324: 
+</span><span class="">  325: =over 4
+</span><span class="">  326: 
+</span><span class="">  327: =item * Populates C&lt;%Schema::Validator::dynamic_schema&gt; with class definitions.
+</span><span class="">  328: 
+</span><span class="">  329: =item * Populates C&lt;%Schema::Validator::dynamic_properties&gt; with property definitions.
 </span><span class="">  330: 
-</span><span class="">  331: =item * C&lt;cache_duration&gt; (optional, scalar) -- cache validity window in seconds.
-</span><span class="">  332: Defaults to C&lt;$config{cache_duration}&gt;.
-</span><span class="">  333: 
-</span><span class="">  334: =item * C&lt;vocab_url&gt; (optional, scalar) -- URL of the JSON-LD vocabulary endpoint.
-</span><span class="">  335: Defaults to C&lt;$config{vocab_url}&gt;.
-</span><span class="">  336: 
-</span><span class="">  337: =item * C&lt;ua_timeout&gt; (optional, scalar) -- LWP::UserAgent timeout in seconds.
-</span><span class="">  338: Defaults to C&lt;$config{ua_timeout}&gt;.
+</span><span class="">  331: =item * Creates or updates the local cache file on a successful download.
+</span><span class="">  332: 
+</span><span class="">  333: =item * Emits C&lt;carp&gt; warnings on network failures, I/O errors, or JSON
+</span><span class="">  334: parse errors.
+</span><span class="">  335: 
+</span><span class="">  336: =back
+</span><span class="">  337: 
+</span><span class="">  338: =head3 NOTES
 </span><span class="">  339: 
-</span><span class="">  340: =back
-</span><span class="">  341: 
-</span><span class="">  342: Both zero-argument and named calling conventions are supported:
+</span><span class="">  340: The default cache directory is determined once at module load time: the
+</span><span class="">  341: C&lt;$CACHEDIR&gt; environment variable is used if set; otherwise C&lt;File::Spec-E&lt;gt&gt;tmpdir()&gt;
+</span><span class="">  342: is used (typically C&lt;/tmp&gt; on Unix).  Override for the session with:
 </span><span class="">  343: 
-</span><span class="">  344:     load_dynamic_vocabulary();
-</span><span class="">  345:     load_dynamic_vocabulary(ua_timeout =&gt; 60);
-</span><span class="">  346: 
-</span><span class="">  347: =head3 RETURNS
+</span><span class="">  344:     $Schema::Validator::config{cache_file} = &#39;/my/path/vocab.jsonld&#39;;
+</span><span class="">  345: 
+</span><span class="">  346: The C&lt;bin/validate-schema&gt; CLI tool imports this function from the module and
+</span><span class="">  347: uses C&lt;cache_file =E&lt;gt&gt; $path&gt; to store its cache under C&lt;~/.cache/schema_validator/&gt;.
 </span><span class="">  348: 
-</span><span class="">  349: A hashref mapping class labels (e.g. C&lt;&#39;Person&#39;&gt;) to their raw JSON-LD
-</span><span class="">  350: definition hashrefs from the C&lt;@graph&gt; array.
-</span><span class="">  351: 
-</span><span class="">  352: Returns an empty hashref C&lt;{}&gt; on all failure paths (network unreachable,
-</span><span class="">  353: no cache, JSON parse error).  Never throws.
-</span><span class="">  354: 
-</span><span class="">  355: =head3 SIDE EFFECTS
-</span><span class="">  356: 
-</span><span class="">  357: =over 4
+</span><span class="">  349: =head3 EXAMPLE
+</span><span class="">  350: 
+</span><span class="">  351:     use Schema::Validator qw(load_dynamic_vocabulary);
+</span><span class="">  352: 
+</span><span class="">  353:     my $classes = load_dynamic_vocabulary();
+</span><span class="">  354:     printf &quot;%d classes loaded\n&quot;, scalar keys %{$classes};
+</span><span class="">  355: 
+</span><span class="">  356:     # Check for a specific class in the returned hashref
+</span><span class="">  357:     print &quot;Has Person\n&quot; if exists $classes-&gt;{&#39;Person&#39;};
 </span><span class="">  358: 
-</span><span class="">  359: =item * Populates C&lt;%Schema::Validator::dynamic_schema&gt; with class definitions.
-</span><span class="">  360: 
-</span><span class="">  361: =item * Populates C&lt;%Schema::Validator::dynamic_properties&gt; with property definitions.
+</span><span class="">  359:     # Or query the package globals directly after the call
+</span><span class="">  360:     Schema::Validator::load_dynamic_vocabulary();
+</span><span class="">  361:     my @names = sort keys %Schema::Validator::dynamic_schema;
 </span><span class="">  362: 
-</span><span class="">  363: =item * Creates or updates the local cache file on a successful download.
+</span><span class="">  363: =head3 API SPECIFICATION
 </span><span class="">  364: 
-</span><span class="">  365: =item * Emits C&lt;carp&gt; warnings on network failures, I/O errors, or JSON
-</span><span class="">  366: parse errors.
-</span><span class="">  367: 
-</span><span class="">  368: =back
-</span><span class="">  369: 
-</span><span class="">  370: =head3 NOTES
-</span><span class="">  371: 
-</span><span class="">  372: The module version of this function stores the cache relative to the process
-</span><span class="">  373: CWD.  Set C&lt;$Schema::Validator::config{cache_file}&gt; to an absolute path if
-</span><span class="">  374: your application changes directory between calls.
+</span><span class="">  365: =head4 Input (Params::Validate::Strict)
+</span><span class="">  366: 
+</span><span class="">  367:     {
+</span><span class="">  368:         cache_file     =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  369:         cache_duration =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  370:         vocab_url      =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  371:         ua_timeout     =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  372:     }
+</span><span class="">  373: 
+</span><span class="">  374: =head4 Output (Return::Set)
 </span><span class="">  375: 
-</span><span class="">  376: The C&lt;bin/validate-schema&gt; CLI tool imports this function from the module and
-</span><span class="">  377: uses C&lt;cache_file =E&lt;gt&gt; $path&gt; to store its cache under C&lt;~/.cache/schema_validator/&gt;,
-</span><span class="">  378: keeping a persistent home-directory cache independent of the process CWD.
-</span><span class="">  379: 
-</span><span class="">  380: =head3 EXAMPLE
-</span><span class="">  381: 
-</span><span class="">  382:     use Schema::Validator qw(load_dynamic_vocabulary);
-</span><span class="">  383: 
-</span><span class="">  384:     my $classes = load_dynamic_vocabulary();
-</span><span class="">  385:     printf &quot;%d classes loaded\n&quot;, scalar keys %{$classes};
-</span><span class="">  386: 
-</span><span class="">  387:     # Check for a specific class in the returned hashref
-</span><span class="">  388:     print &quot;Has Person\n&quot; if exists $classes-&gt;{&#39;Person&#39;};
-</span><span class="">  389: 
-</span><span class="">  390:     # Or query the package globals directly after the call
-</span><span class="">  391:     Schema::Validator::load_dynamic_vocabulary();
-</span><span class="">  392:     my @names = sort keys %Schema::Validator::dynamic_schema;
-</span><span class="">  393: 
-</span><span class="">  394: =head3 API SPECIFICATION
-</span><span class="">  395: 
-</span><span class="">  396: =head4 Input (Params::Validate::Strict)
-</span><span class="">  397: 
-</span><span class="">  398:     {
-</span><span class="">  399:         cache_file     =&gt; { type =&gt; SCALAR, optional =&gt; 1 },
-</span><span class="">  400:         cache_duration =&gt; { type =&gt; SCALAR, optional =&gt; 1 },
-</span><span class="">  401:         vocab_url      =&gt; { type =&gt; SCALAR, optional =&gt; 1 },
-</span><span class="">  402:         ua_timeout     =&gt; { type =&gt; SCALAR, optional =&gt; 1 },
-</span><span class="">  403:     }
-</span><span class="">  404: 
-</span><span class="">  405: =head4 Output (Return::Set)
-</span><span class="">  406: 
-</span><span class="">  407:     RETURN_TYPE  =&gt; HASHREF
-</span><span class="">  408:     DESCRIPTION  =&gt; &#39;class-label =&gt; JSON-LD item hashref&#39;
-</span><span class="">  409:     ON_FAILURE   =&gt; &#39;empty hashref {}; never throws&#39;
-</span><span class="">  410:     SIDE_EFFECTS =&gt; &#39;populates %dynamic_schema and %dynamic_properties&#39;
-</span><span class="">  411: 
-</span><span class="">  412: =head3 FORMAL SPECIFICATION
-</span><span class="">  413: 
-</span><span class="">  414:     Let FILE, DUR, URL be the resolved config values.
-</span><span class="">  415:     Let now : N be the current UNIX epoch time.
-</span><span class="">  416:     Let mtime : PATH -&gt; N map a path to its last-modification time.
-</span><span class="">  417:     Let readable, writeable : PATH -&gt; B be filesystem predicates.
-</span><span class="">  418:     Let reachable : URL -&gt; B test HTTP reachability.
-</span><span class="">  419:     Let slurp : PATH -&gt; seq CHAR and spit : PATH x seq CHAR -&gt; 1.
-</span><span class="">  420:     Let fetch : URL x N -&gt; seq CHAR (second arg is timeout).
-</span><span class="">  421:     Let decode_json : seq CHAR -&gt; ITEM.
-</span><span class="">  422:     Let label : ITEM -&gt; (LABEL | {}) extract rdfs:label.
-</span><span class="">  423:     Let types : ITEM -&gt; P TYPE extract @type values.
-</span><span class="">  424: 
-</span><span class="">  425:     FRESH &acirc;&#137;&#156; ( -e(FILE) ) &acirc;&#136;&sect; ( (now - mtime(FILE)) &lt; DUR )
-</span><span class="">  426: 
-</span><span class="">  427:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  428:      LoadDynamicVocabulary
-</span><span class="">  429:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  430:      &Icirc;&#148;VocabularyStore
-</span><span class="">  431:      cache_file?     : PATH
-</span><span class="">  432:      cache_duration? : N
-</span><span class="">  433:      vocab_url?      : URL
-</span><span class="">  434:      ua_timeout?     : N
-</span><span class="">  435:      result!         : CLASS_LABEL &acirc;&#135;&cedil; ITEM
-</span><span class="">  436:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  437:      content : seq CHAR
-</span><span class="">  438: 
-</span><span class="">  439:      FRESH &acirc;&#136;&sect; readable(cache_file?)
-</span><span class="">  440:          &acirc;&#135;&#146; content = slurp(cache_file?)
-</span><span class="">  441: 
-</span><span class="">  442:      &Acirc;&not;FRESH &acirc;&#136;&sect; reachable(vocab_url?)
-</span><span class="">  443:          &acirc;&#135;&#146; content = fetch(vocab_url?, ua_timeout?)
-</span><span class="">  444:            &acirc;&#136;&sect; ( writeable(cache_file?) &acirc;&#135;&#146; spit(cache_file?, content) )
-</span><span class="">  445: 
-</span><span class="">  446:      &Acirc;&not;FRESH &acirc;&#136;&sect; &Acirc;&not;reachable(vocab_url?) &acirc;&#136;&sect; -e(cache_file?)
-</span><span class="">  447:          &acirc;&#135;&#146; content = slurp(cache_file?)
-</span><span class="">  448: 
-</span><span class="">  449:      graph &acirc;&#137;&#156; (decode_json content)[AT_GRAPH]
-</span><span class="">  450: 
-</span><span class="">  451:      dynamic_schema&#39; =
-</span><span class="">  452:          { item &acirc;&#136;&#136; graph | RDF_CLASS &acirc;&#136;&#136; types(item) &acirc;&#136;&sect; label(item) &acirc;&#137;&nbsp; &acirc;&#136;&#133;
-</span><span class="">  453:            &acirc;&#128;&cent; label(item) &acirc;&#134;&brvbar; item }
-</span><span class="">  454: 
-</span><span class="">  455:      dynamic_properties&#39; =
-</span><span class="">  456:          { item &acirc;&#136;&#136; graph | RDF_PROPERTY &acirc;&#136;&#136; types(item) &acirc;&#136;&sect; label(item) &acirc;&#137;&nbsp; &acirc;&#136;&#133;
-</span><span class="">  457:            &acirc;&#128;&cent; label(item) &acirc;&#134;&brvbar; item }
-</span><span class="">  458: 
-</span><span class="">  459:      result! = dynamic_schema&#39;
-</span><span class="">  460:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
-</span><span class="">  461: 
-</span><span class="">  462: =cut
-</span><span class="">  463: 
-</span><span class="">  464: sub load_dynamic_vocabulary {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">465 → 468 → 481</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">465 → 468 → 0</span></span>  465: 	my $params;
-</span><span class="">  466: 
-</span><span class="">  467: 	# Validate types of any supplied overrides (all are optional scalars).
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  468: 	if(scalar(@_)) {
+</span><span class="">  376:     {
+</span><span class="">  377: 	type  =&gt; &#39;hashref&#39;,
+</span><span class="">  378: 	description  =&gt; &#39;class-label =&gt; JSON-LD item hashref&#39;
+</span><span class="">  379: 	# ON_FAILURE   =&gt; &#39;empty hashref {}; never throws&#39;
+</span><span class="">  380: 	# SIDE_EFFECTS =&gt; &#39;populates %dynamic_schema and %dynamic_properties&#39;
+</span><span class="">  381:     }
+</span><span class="">  382: 
+</span><span class="">  383: =cut
+</span><span class="">  384: 
+</span><span class="">  385: sub load_dynamic_vocabulary {
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">386 → 389 → 402</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">386 → 389 → 0</span></span>  386: 	my $params;
+</span><span class="">  387: 
+</span><span class="">  388: 	# Validate types of any supplied overrides (all are optional scalars).
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  389: 	if(scalar(@_)) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_468_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_389_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  469: 		$params = validate_strict(
-</span><span class="">  470: 			input =&gt; get_params(undef, \@_),
-</span><span class="">  471: 			schema   =&gt; {
-</span><span class="">  472: 				cache_file     =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
-</span><span class="">  473: 				cache_duration =&gt; { type =&gt; &#39;integer&#39;, optional =&gt; 1 },
-</span><span class="">  474: 				vocab_url      =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
-</span><span class="">  475: 				ua_timeout     =&gt; { type =&gt; &#39;integer&#39;, optional =&gt; 1 },
-</span><span class="">  476: 			}
-</span><span class="">  477: 		);
-</span><span class="">  478: 	}
-</span><span class="">  479: 
-</span><span class="">  480: 	# Merge caller overrides with module-level configuration defaults.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">481 → 490 → 496</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">481 → 490 → 0</span></span>  481: 	my $cache_file     = $params-&gt;{cache_file}     // $config{cache_file};
-</span><span class="">  482: 	my $cache_duration = $params-&gt;{cache_duration} // $config{cache_duration};
-</span><span class="">  483: 	my $vocab_url      = $params-&gt;{vocab_url}      // $config{vocab_url};
-</span><span class="">  484: 	my $ua_timeout     = $params-&gt;{ua_timeout}     // $config{ua_timeout};
-</span><span class="">  485: 
-</span><span class="">  486: 	my $content;
-</span><span class="">  487: 
-</span><span class="">  488: 	# Attempt to read a fresh cache file.  Open directly to avoid the TOCTOU
-</span><span class="">  489: 	# race that would exist between a separate -e test and the open call.
-</span><span class="survived-3 tooltip" data-tooltip="Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one). Mutation survived. Add targeted tests to validate this branch.">  490: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
+<span class="">  390: 		$params = validate_strict(
+</span><span class="">  391: 			input =&gt; get_params(undef, \@_),
+</span><span class="">  392: 			schema   =&gt; {
+</span><span class="">  393: 				cache_file     =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  394: 				cache_duration =&gt; { type =&gt; &#39;integer&#39;, optional =&gt; 1 },
+</span><span class="">  395: 				vocab_url      =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 1 },
+</span><span class="">  396: 				ua_timeout     =&gt; { type =&gt; &#39;integer&#39;, optional =&gt; 1 },
+</span><span class="">  397: 			}
+</span><span class="">  398: 		);
+</span><span class="">  399: 	}
+</span><span class="">  400: 
+</span><span class="">  401: 	# Merge caller overrides with module-level configuration defaults.
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">402 → 411 → 417</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">402 → 411 → 0</span></span>  402: 	my $cache_file     = $params-&gt;{cache_file}     // $config{cache_file};
+</span><span class="">  403: 	my $cache_duration = $params-&gt;{cache_duration} // $config{cache_duration};
+</span><span class="">  404: 	my $vocab_url      = $params-&gt;{vocab_url}      // $config{vocab_url};
+</span><span class="">  405: 	my $ua_timeout     = $params-&gt;{ua_timeout}     // $config{ua_timeout};
+</span><span class="">  406: 
+</span><span class="">  407: 	my $content;
+</span><span class="">  408: 
+</span><span class="">  409: 	# Attempt to read a fresh cache file.  Open directly to avoid the TOCTOU
+</span><span class="">  410: 	# race that would exist between a separate -e test and the open call.
+</span><span class="survived-3 tooltip" data-tooltip="Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one). Mutation survived. Add targeted tests to validate this branch.">  411: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 4, Killed: 0, Survived: 4)</summary>
 					<ul>
-				<li><b>NUM_BOUNDARY_490_55_>: Numeric boundary flip < to ></b><br>HIGH: Likely missing edge-case test (boundary value)
+				<li><b>NUM_BOUNDARY_411_55_>: Numeric boundary flip < to ></b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -819,7 +740,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_490_55_<=: Numeric boundary flip < to <=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_411_55_<=: Numeric boundary flip < to <=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -827,7 +748,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_490_55_>=: Numeric boundary flip < to >=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_411_55_>=: Numeric boundary flip < to >=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -835,129 +756,276 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>COND_INV_490_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+							</li><li><b>COND_INV_411_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  491: 		eval { $content = _slurp_file($cache_file) };
-</span><span class="">  492: 		carp &quot;Could not read cache &#39;$cache_file&#39;: $@&quot; if $@;
-</span><span class="">  493: 	}
-</span><span class="">  494: 
-</span><span class="">  495: 	# If no usable content yet, try to download the vocabulary.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">496 → 496 → 517</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">496 → 496 → 0</span></span>  496: 	unless (defined $content) {
+<span class="">  412: 		eval { $content = _slurp_file($cache_file) };
+</span><span class="">  413: 		carp &quot;Could not read cache &#39;$cache_file&#39;: $@&quot; if $@;
+</span><span class="">  414: 	}
+</span><span class="">  415: 
+</span><span class="">  416: 	# If no usable content yet, try to download the vocabulary.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">417 → 417 → 438</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">417 → 417 → 0</span></span>  417: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_496_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_417_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  497: 		$content = _fetch_url($vocab_url, $ua_timeout);
-</span><span class="">  498: 
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  499: 		if (defined $content) {
+<span class="">  418: 		$content = _fetch_url($vocab_url, $ua_timeout);
+</span><span class="">  419: 
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  420: 		if (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_499_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_420_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  500: 			# Persist the download to the cache (best-effort; warn, do not die).
-</span><span class="">  501: 			eval { _spit_file($cache_file, $content) };
-</span><span class="">  502: 			carp &quot;Could not write cache &#39;$cache_file&#39;: $@&quot; if $@;
-</span><span class="">  503: 		} else {
-</span><span class="">  504: 			# Network failed; fall back to a stale cache if one exists.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  505: 			if (-e $cache_file) {
+<span class="">  421: 			# Persist the download to the cache (best-effort; warn, do not die).
+</span><span class="">  422: 			eval { _spit_file($cache_file, $content) };
+</span><span class="">  423: 			carp &quot;Could not write cache &#39;$cache_file&#39;: $@&quot; if $@;
+</span><span class="">  424: 		} else {
+</span><span class="">  425: 			# Network failed; fall back to a stale cache if one exists.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  426: 			if (-e $cache_file) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_505_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_426_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  506: 				eval { $content = _slurp_file($cache_file) };
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  507: 				if ($@) {
+<span class="">  427: 				eval { $content = _slurp_file($cache_file) };
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  428: 				if ($@) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_507_5: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_428_5: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  508: 					carp &quot;Could not read stale cache &#39;$cache_file&#39;: $@&quot;;
-</span><span class="">  509: 				} else {
-</span><span class="">  510: 					carp &quot;Network unavailable; using stale cache &#39;$cache_file&#39;&quot;;
-</span><span class="">  511: 				}
-</span><span class="">  512: 			}
-</span><span class="">  513: 		}
-</span><span class="">  514: 	}
-</span><span class="">  515: 
-</span><span class="">  516: 	# All content-acquisition strategies failed; return empty result.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">517 → 517 → 523</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">517 → 517 → 0</span></span>  517: 	unless (defined $content) {
+<span class="">  429: 					carp &quot;Could not read stale cache &#39;$cache_file&#39;: $@&quot;;
+</span><span class="">  430: 				} else {
+</span><span class="">  431: 					carp &quot;Network unavailable; using stale cache &#39;$cache_file&#39;&quot;;
+</span><span class="">  432: 				}
+</span><span class="">  433: 			}
+</span><span class="">  434: 		}
+</span><span class="">  435: 	}
+</span><span class="">  436: 
+</span><span class="">  437: 	# All content-acquisition strategies failed; return empty result.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">438 → 438 → 444</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">438 → 438 → 0</span></span>  438: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_517_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_438_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  518: 		carp &#39;load_dynamic_vocabulary: no vocabulary content available&#39;;
-</span><span class="">  519: 		return {};
-</span><span class="">  520: 	}
-</span><span class="">  521: 
-</span><span class="">  522: 	# Parse the JSON; treat errors as non-fatal warnings.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">523 → 524 → 532</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">523 → 524 → 0</span></span>  523: 	my $data = eval { decode_json($content) };
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  524: 	if ($@) {
+<span class="">  439: 		carp &#39;load_dynamic_vocabulary: no vocabulary content available&#39;;
+</span><span class="">  440: 		return {};
+</span><span class="">  441: 	}
+</span><span class="">  442: 
+</span><span class="">  443: 	# Parse the JSON; treat errors as non-fatal warnings.
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">444 → 445 → 453</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">444 → 445 → 0</span></span>  444: 	my $data = eval { decode_json($content) };
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  445: 	if ($@) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_524_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_445_2: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  525: 		carp &quot;Failed to parse vocabulary JSON: $@&quot;;
-</span><span class="">  526: 		return {};
-</span><span class="">  527: 	}
+<span class="">  446: 		carp &quot;Failed to parse vocabulary JSON: $@&quot;;
+</span><span class="">  447: 		return {};
+</span><span class="">  448: 	}
+</span><span class="">  449: 
+</span><span class="">  450: 	# Guard against decode_json returning a non-object (e.g. a JSON array,
+</span><span class="">  451: 	# a bare number, or any other non-hash type).  Calling exists on a
+</span><span class="">  452: 	# non-hashref dies; catching it here keeps the &quot;never throws&quot; contract.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">453 → 453 → 459</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">453 → 453 → 0</span></span>  453: 	unless (ref($data) eq &#39;HASH&#39;) {
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
+					<ul>
+				<li><b>COND_INV_453_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  454: 		carp &quot;Vocabulary JSON is not a JSON object&quot;;
+</span><span class="">  455: 		return {};
+</span><span class="">  456: 	}
+</span><span class="">  457: 
+</span><span class="">  458: 	# Confirm the expected JSON-LD graph structure is present.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">459 → 459 → 465</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">459 → 459 → 0</span></span>  459: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
+					<ul>
+				<li><b>COND_INV_459_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  460: 		carp &quot;Vocabulary JSON is missing the &#39;\@graph&#39; array&quot;;
+</span><span class="">  461: 		return {};
+</span><span class="">  462: 	}
+</span><span class="">  463: 
+</span><span class="">  464: 	# Delegate parsing to the internal graph processor.
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">465 → 479 → 0</span></span>  465: 	my ($classes, $props) = _parse_graph($data-&gt;{$AT_GRAPH});
+</span><span class="">  466: 
+</span><span class="">  467: 	# Populate package globals as documented side-effects.
+</span><span class="">  468: 	%dynamic_schema     = %{$classes};
+</span><span class="">  469: 	%dynamic_properties = %{$props};
+</span><span class="">  470: 
+</span><span class="">  471: 	# Report the result count via carp (informational, not an error).
+</span><span class="">  472: 	carp sprintf(
+</span><span class="">  473: 		&#39;Dynamic vocabulary loaded: %d classes, %d properties&#39;,
+</span><span class="">  474: 		scalar(keys %dynamic_schema),
+</span><span class="">  475: 		scalar(keys %dynamic_properties),
+</span><span class="">  476: 	);
+</span><span class="">  477: 
+</span><span class="">  478: 	# Return the class hashref; callers needing properties use the global.
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  479: 	return $classes;
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
+					<ul>
+				<li><b>BOOL_NEGATE_479_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Boolean branch test suggestion
+ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
+</pre>
+								</div>
+							</li><li><b>RETURN_UNDEF_479_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Return value assertion
+is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
+</pre>
+								</div>
+							</li></ul></details>
+<span class="">  480: }
+</span><span class="">  481: 
+</span><span class="">  482: # ===========================================================================
+</span><span class="">  483: # INTERNAL HELPERS
+</span><span class="">  484: # All routines below begin with _ and are not part of the public API.
+</span><span class="">  485: # ===========================================================================
+</span><span class="">  486: 
+</span><span class="">  487: # ---------------------------------------------------------------------------
+</span><span class="">  488: # _slurp_file($path)
+</span><span class="">  489: #
+</span><span class="">  490: # Purpose:  Read the complete contents of a file into a scalar.
+</span><span class="">  491: # Entry:    $path is a path to an existing, readable file.
+</span><span class="">  492: # Returns:  The file contents as a scalar string.
+</span><span class="">  493: # Side fx:  None beyond reading the file.
+</span><span class="">  494: # Notes:    autodie causes open/close to throw on failure; callers should
+</span><span class="">  495: #           wrap in eval { } and handle $@ if a non-fatal path is needed.
+</span><span class="">  496: # ---------------------------------------------------------------------------
+</span><span class="">  497: sub _slurp_file {
+</span><span class="">  498: 	my ($path) = @_;
+</span><span class="">  499: 
+</span><span class="">  500: 	# Open the file; autodie will throw if this fails.
+</span><span class="">  501: 	open my $fh, &#39;&lt;&#39;, $path;
+</span><span class="">  502: 
+</span><span class="">  503: 	# Temporarily undefine $/ to read the whole file in one operation.
+</span><span class="">  504: 	local $/;
+</span><span class="">  505: 	my $content = &lt;$fh&gt;;
+</span><span class="">  506: 
+</span><span class="">  507: 	close $fh;
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  508: 	return $content;
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
+					<ul>
+				<li><b>BOOL_NEGATE_508_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Boolean branch test suggestion
+ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
+</pre>
+								</div>
+							</li><li><b>RETURN_UNDEF_508_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Return value assertion
+is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
+</pre>
+								</div>
+							</li></ul></details>
+<span class="">  509: }
+</span><span class="">  510: 
+</span><span class="">  511: # ---------------------------------------------------------------------------
+</span><span class="">  512: # _spit_file($path, $content)
+</span><span class="">  513: #
+</span><span class="">  514: # Purpose:  Write a scalar string to a file, creating or truncating it.
+</span><span class="">  515: # Entry:    $path is a writable path; $content is a defined scalar.
+</span><span class="">  516: # Returns:  1 on success.
+</span><span class="">  517: # Side fx:  Creates or overwrites $path.
+</span><span class="">  518: # Notes:    autodie causes open/close to throw on failure; wrap in eval
+</span><span class="">  519: #           when the write is non-critical (e.g. cache population).
+</span><span class="">  520: # ---------------------------------------------------------------------------
+</span><span class="">  521: sub _spit_file {
+</span><span class="">  522: 	my ($path, $content) = @_;
+</span><span class="">  523: 
+</span><span class="">  524: 	# Open for writing; autodie throws on permission or path errors.
+</span><span class="">  525: 	open my $fh, &#39;&gt;&#39;, $path;
+</span><span class="">  526: 	print $fh $content;
+</span><span class="">  527: 	close $fh;
 </span><span class="">  528: 
-</span><span class="">  529: 	# Guard against decode_json returning a non-object (e.g. a JSON array,
-</span><span class="">  530: 	# a bare number, or any other non-hash type).  Calling exists on a
-</span><span class="">  531: 	# non-hashref dies; catching it here keeps the &quot;never throws&quot; contract.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">532 → 532 → 538</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">532 → 532 → 0</span></span>  532: 	unless (ref($data) eq &#39;HASH&#39;) {
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  529: 	return 1;
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
+					<ul>
+				<li><b>BOOL_NEGATE_529_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Boolean branch test suggestion
+ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
+</pre>
+								</div>
+							</li><li><b>RETURN_UNDEF_529_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+
+								<div class="suggested-test">
+								<div class="suggest-label">🧪 Suggested Test</div>
+								<pre># Return value assertion
+is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
+</pre>
+								</div>
+							</li></ul></details>
+<span class="">  530: }
+</span><span class="">  531: 
+</span><span class="">  532: # ---------------------------------------------------------------------------
+</span><span class="">  533: # _fetch_url($url, $timeout)
+</span><span class="">  534: #
+</span><span class="">  535: # Purpose:  Perform an HTTP GET and return the decoded response body.
+</span><span class="">  536: # Entry:    $url is a valid absolute HTTP/HTTPS URL; $timeout is a positive
+</span><span class="">  537: #           integer (seconds).
+</span><span class="">  538: # Returns:  Decoded response content on success; undef on HTTP error.
+</span><span class="">  539: # Side fx:  Network I/O; emits carp on non-success HTTP status.
+</span><span class="">  540: # Notes:    Transport-level errors (DNS failure, TLS error) may propagate as
+</span><span class="">  541: #           exceptions from LWP::UserAgent; callers should wrap in eval if
+</span><span class="">  542: #           they need a guaranteed non-throwing call.
+</span><span class="">  543: # ---------------------------------------------------------------------------
+</span><span class="">  544: sub _fetch_url {
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">545 → 552 → 557</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">545 → 552 → 0</span></span>  545: 	my ($url, $timeout) = @_;
+</span><span class="">  546: 
+</span><span class="">  547: 	# Build a minimal UA; timeout prevents indefinite hangs.
+</span><span class="">  548: 	my $ua  = LWP::UserAgent-&gt;new(timeout =&gt; $timeout);
+</span><span class="">  549: 	my $res = $ua-&gt;get($url);
+</span><span class="">  550: 
+</span><span class="">  551: 	# Treat any non-2xx status as a soft failure so callers can try fallbacks.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  552: 	unless ($res-&gt;is_success) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_532_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_552_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  533: 		carp &quot;Vocabulary JSON is not a JSON object&quot;;
-</span><span class="">  534: 		return {};
-</span><span class="">  535: 	}
-</span><span class="">  536: 
-</span><span class="">  537: 	# Confirm the expected JSON-LD graph structure is present.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">538 → 538 → 544</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">538 → 538 → 0</span></span>  538: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_538_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  539: 		carp &quot;Vocabulary JSON is missing the &#39;\@graph&#39; array&quot;;
-</span><span class="">  540: 		return {};
-</span><span class="">  541: 	}
-</span><span class="">  542: 
-</span><span class="">  543: 	# Delegate parsing to the internal graph processor.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">544 → 558 → 0</span></span>  544: 	my ($classes, $props) = _parse_graph($data-&gt;{$AT_GRAPH});
-</span><span class="">  545: 
-</span><span class="">  546: 	# Populate package globals as documented side-effects.
-</span><span class="">  547: 	%dynamic_schema     = %{$classes};
-</span><span class="">  548: 	%dynamic_properties = %{$props};
-</span><span class="">  549: 
-</span><span class="">  550: 	# Report the result count via carp (informational, not an error).
-</span><span class="">  551: 	carp sprintf(
-</span><span class="">  552: 		&#39;Dynamic vocabulary loaded: %d classes, %d properties&#39;,
-</span><span class="">  553: 		scalar(keys %dynamic_schema),
-</span><span class="">  554: 		scalar(keys %dynamic_properties),
-</span><span class="">  555: 	);
+<span class="">  553: 		carp &quot;Failed to fetch &#39;$url&#39;: &quot;, $res-&gt;status_line;
+</span><span class="">  554: 		return;
+</span><span class="">  555: 	}
 </span><span class="">  556: 
-</span><span class="">  557: 	# Return the class hashref; callers needing properties use the global.
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  558: 	return $classes;
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">557 → 557 → 0</span></span>  557: 	return $res-&gt;decoded_content;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_558_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>BOOL_NEGATE_557_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -965,7 +1033,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>RETURN_UNDEF_558_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
+							</li><li><b>RETURN_UNDEF_557_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -974,350 +1042,270 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </pre>
 								</div>
 							</li></ul></details>
-<span class="">  559: }
-</span><span class="">  560: 
-</span><span class="">  561: # ===========================================================================
-</span><span class="">  562: # INTERNAL HELPERS
-</span><span class="">  563: # All routines below begin with _ and are not part of the public API.
-</span><span class="">  564: # ===========================================================================
-</span><span class="">  565: 
-</span><span class="">  566: # ---------------------------------------------------------------------------
-</span><span class="">  567: # _slurp_file($path)
-</span><span class="">  568: #
-</span><span class="">  569: # Purpose:  Read the complete contents of a file into a scalar.
-</span><span class="">  570: # Entry:    $path is a path to an existing, readable file.
-</span><span class="">  571: # Returns:  The file contents as a scalar string.
-</span><span class="">  572: # Side fx:  None beyond reading the file.
-</span><span class="">  573: # Notes:    autodie causes open/close to throw on failure; callers should
-</span><span class="">  574: #           wrap in eval { } and handle $@ if a non-fatal path is needed.
-</span><span class="">  575: # ---------------------------------------------------------------------------
-</span><span class="">  576: sub _slurp_file {
-</span><span class="">  577: 	my ($path) = @_;
+<span class="">  558: }
+</span><span class="">  559: 
+</span><span class="">  560: # ---------------------------------------------------------------------------
+</span><span class="">  561: # _extract_label($item)
+</span><span class="">  562: #
+</span><span class="">  563: # Purpose:  Extract the rdfs:label string from a JSON-LD graph item hashref.
+</span><span class="">  564: # Entry:    $item is a hashref that may contain &#39;rdfs:label&#39; or the full
+</span><span class="">  565: #           URI equivalent key.
+</span><span class="">  566: # Returns:  The label as a plain string, or undef if no label is found.
+</span><span class="">  567: # Side fx:  None.
+</span><span class="">  568: # Notes:    Schema.org JSON-LD may represent the label as a scalar string or
+</span><span class="">  569: #           as an array (for multi-language entries); this function always
+</span><span class="">  570: #           returns the first (or only) value.
+</span><span class="">  571: # ---------------------------------------------------------------------------
+</span><span class="">  572: sub _extract_label {
+</span><span class="">  573: 	my ($item) = @_;
+</span><span class="">  574: 
+</span><span class="">  575: 	# Try the compact key first; fall back to the full RDF URI form.
+</span><span class="">  576: 	my $label = $item-&gt;{$RDFS_LABEL} // $item-&gt;{$RDFS_LABEL_FULL};
+</span><span class="">  577: 	return unless defined $label;
 </span><span class="">  578: 
-</span><span class="">  579: 	# Open the file; autodie will throw if this fails.
-</span><span class="">  580: 	open my $fh, &#39;&lt;&#39;, $path;
-</span><span class="">  581: 
-</span><span class="">  582: 	# Temporarily undefine $/ to read the whole file in one operation.
-</span><span class="">  583: 	local $/;
-</span><span class="">  584: 	my $content = &lt;$fh&gt;;
-</span><span class="">  585: 
-</span><span class="">  586: 	close $fh;
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  587: 	return $content;
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
-					<ul>
-				<li><b>BOOL_NEGATE_587_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Boolean branch test suggestion
-ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
-</pre>
-								</div>
-							</li><li><b>RETURN_UNDEF_587_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Return value assertion
-is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
-</pre>
-								</div>
-							</li></ul></details>
-<span class="">  588: }
-</span><span class="">  589: 
-</span><span class="">  590: # ---------------------------------------------------------------------------
-</span><span class="">  591: # _spit_file($path, $content)
-</span><span class="">  592: #
-</span><span class="">  593: # Purpose:  Write a scalar string to a file, creating or truncating it.
-</span><span class="">  594: # Entry:    $path is a writable path; $content is a defined scalar.
-</span><span class="">  595: # Returns:  1 on success.
-</span><span class="">  596: # Side fx:  Creates or overwrites $path.
-</span><span class="">  597: # Notes:    autodie causes open/close to throw on failure; wrap in eval
-</span><span class="">  598: #           when the write is non-critical (e.g. cache population).
-</span><span class="">  599: # ---------------------------------------------------------------------------
-</span><span class="">  600: sub _spit_file {
-</span><span class="">  601: 	my ($path, $content) = @_;
+</span><span class="">  579: 	# If the label is multi-valued, take the first entry.
+</span><span class="">  580: 	return ref($label) eq &#39;ARRAY&#39; ? $label-&gt;[0] : $label;
+</span><span class="">  581: }
+</span><span class="">  582: 
+</span><span class="">  583: # ---------------------------------------------------------------------------
+</span><span class="">  584: # _parse_graph(\@graph)
+</span><span class="">  585: #
+</span><span class="">  586: # Purpose:  Iterate over a JSON-LD @graph array and partition items into
+</span><span class="">  587: #           Schema.org class definitions and property definitions.
+</span><span class="">  588: # Entry:    $graph_ref is an arrayref of item hashrefs as decoded from the
+</span><span class="">  589: #           Schema.org JSON-LD vocabulary.
+</span><span class="">  590: # Returns:  Two hashrefs: (\%classes, \%properties), each keyed by label.
+</span><span class="">  591: #           Items are also indexed by the short name extracted from their
+</span><span class="">  592: #           @id URI so that both &#39;MusicEvent&#39; and its label resolve correctly.
+</span><span class="">  593: # Side fx:  None.
+</span><span class="">  594: # Notes:    Items with no recognisable label or @type are silently skipped.
+</span><span class="">  595: #           The @id short-name index uses //= so the label always wins if
+</span><span class="">  596: #           it differs.
+</span><span class="">  597: # ---------------------------------------------------------------------------
+</span><span class="">  598: sub _parse_graph {
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">599 → 604 → 639</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">599 → 604 → 0</span></span>  599: 	my ($graph_ref) = @_;
+</span><span class="">  600: 
+</span><span class="">  601: 	my (%classes, %props);
 </span><span class="">  602: 
-</span><span class="">  603: 	# Open for writing; autodie throws on permission or path errors.
-</span><span class="">  604: 	open my $fh, &#39;&gt;&#39;, $path;
-</span><span class="">  605: 	print $fh $content;
-</span><span class="">  606: 	close $fh;
-</span><span class="">  607: 
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  608: 	return 1;
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
-					<ul>
-				<li><b>BOOL_NEGATE_608_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Boolean branch test suggestion
-ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
-</pre>
-								</div>
-							</li><li><b>RETURN_UNDEF_608_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Return value assertion
-is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
-</pre>
-								</div>
-							</li></ul></details>
-<span class="">  609: }
-</span><span class="">  610: 
-</span><span class="">  611: # ---------------------------------------------------------------------------
-</span><span class="">  612: # _fetch_url($url, $timeout)
-</span><span class="">  613: #
-</span><span class="">  614: # Purpose:  Perform an HTTP GET and return the decoded response body.
-</span><span class="">  615: # Entry:    $url is a valid absolute HTTP/HTTPS URL; $timeout is a positive
-</span><span class="">  616: #           integer (seconds).
-</span><span class="">  617: # Returns:  Decoded response content on success; undef on HTTP error.
-</span><span class="">  618: # Side fx:  Network I/O; emits carp on non-success HTTP status.
-</span><span class="">  619: # Notes:    Transport-level errors (DNS failure, TLS error) may propagate as
-</span><span class="">  620: #           exceptions from LWP::UserAgent; callers should wrap in eval if
-</span><span class="">  621: #           they need a guaranteed non-throwing call.
-</span><span class="">  622: # ---------------------------------------------------------------------------
-</span><span class="">  623: sub _fetch_url {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">624 → 631 → 636</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">624 → 631 → 0</span></span>  624: 	my ($url, $timeout) = @_;
-</span><span class="">  625: 
-</span><span class="">  626: 	# Build a minimal UA; timeout prevents indefinite hangs.
-</span><span class="">  627: 	my $ua  = LWP::UserAgent-&gt;new(timeout =&gt; $timeout);
-</span><span class="">  628: 	my $res = $ua-&gt;get($url);
-</span><span class="">  629: 
-</span><span class="">  630: 	# Treat any non-2xx status as a soft failure so callers can try fallbacks.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  631: 	unless ($res-&gt;is_success) {
+</span><span class="">  603: 	# Iterate every item in the JSON-LD graph array.
+</span><span class="">  604: 	for my $item (@{$graph_ref}) {
+</span><span class="">  605: 
+</span><span class="">  606: 		# Skip items that do not declare an RDF type.
+</span><span class="">  607: 		next unless exists $item-&gt;{&#39;@type&#39;};
+</span><span class="">  608: 		my $item_type = $item-&gt;{&#39;@type&#39;};
+</span><span class="">  609: 
+</span><span class="">  610: 		# Normalise @type: the spec allows either a scalar or an array.
+</span><span class="">  611: 		my @types = ref($item_type) eq &#39;ARRAY&#39; ? @{$item_type} : ($item_type);
+</span><span class="">  612: 
+</span><span class="">  613: 		# Extract the human-readable label; skip items with none.
+</span><span class="">  614: 		my $label = _extract_label($item) or next;
+</span><span class="">  615: 
+</span><span class="">  616: 		# Index rdfs:Class items under their label and their @id short name.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  617: 		if (grep { $_ eq $RDF_CLASS } @types) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>COND_INV_631_2: Invert condition unless to if</b><br>MEDIUM: Add tests asserting both true and false outcomes
+				<li><b>COND_INV_617_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
 </li></ul></details>
-<span class="">  632: 		carp &quot;Failed to fetch &#39;$url&#39;: &quot;, $res-&gt;status_line;
-</span><span class="">  633: 		return;
-</span><span class="">  634: 	}
-</span><span class="">  635: 
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">636 → 636 → 0</span></span>  636: 	return $res-&gt;decoded_content;
+<span class="">  618: 			$classes{$label} = $item;
+</span><span class="">  619: 
+</span><span class="">  620: 			# Secondary index by short URI fragment (e.g. &#39;MusicGroup&#39;).
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  621: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
 </span>
 					<details class="mutant-details">
-					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
 					<ul>
-				<li><b>BOOL_NEGATE_636_2: Negate boolean return expression</b><br>MEDIUM: Add tests asserting both true and false outcomes
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Boolean branch test suggestion
-ok( !func(INPUT), &#39;Verify boolean branch behaviour&#39; );
-</pre>
-								</div>
-							</li><li><b>RETURN_UNDEF_636_2: Replace return expression with undef</b><br>LOW: Mutation survived, but impact may be minor
-
-								<div class="suggested-test">
-								<div class="suggest-label">🧪 Suggested Test</div>
-								<pre># Return value assertion
-is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
-</pre>
-								</div>
-							</li></ul></details>
-<span class="">  637: }
+				<li><b>COND_INV_621_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  622: 				(my $short = $id) =~ s{.*/}{};
+</span><span class="">  623: 				$classes{$short} //= $item;
+</span><span class="">  624: 			}
+</span><span class="">  625: 		}
+</span><span class="">  626: 
+</span><span class="">  627: 		# Index rdf:Property items under their label and @id short name.
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  628: 		if (grep { $_ eq $RDF_PROPERTY } @types) {
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
+					<ul>
+				<li><b>COND_INV_628_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  629: 			$props{$label} = $item;
+</span><span class="">  630: 
+</span><span class="">  631: 			# Secondary index by short URI fragment (e.g. &#39;startDate&#39;).
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  632: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
+</span>
+					<details class="mutant-details">
+					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
+					<ul>
+				<li><b>COND_INV_632_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
+</li></ul></details>
+<span class="">  633: 				(my $short = $id) =~ s{.*/}{};
+</span><span class="">  634: 				$props{$short} //= $item;
+</span><span class="">  635: 			}
+</span><span class="">  636: 		}
+</span><span class="">  637: 	}
 </span><span class="">  638: 
-</span><span class="">  639: # ---------------------------------------------------------------------------
-</span><span class="">  640: # _extract_label($item)
-</span><span class="">  641: #
-</span><span class="">  642: # Purpose:  Extract the rdfs:label string from a JSON-LD graph item hashref.
-</span><span class="">  643: # Entry:    $item is a hashref that may contain &#39;rdfs:label&#39; or the full
-</span><span class="">  644: #           URI equivalent key.
-</span><span class="">  645: # Returns:  The label as a plain string, or undef if no label is found.
-</span><span class="">  646: # Side fx:  None.
-</span><span class="">  647: # Notes:    Schema.org JSON-LD may represent the label as a scalar string or
-</span><span class="">  648: #           as an array (for multi-language entries); this function always
-</span><span class="">  649: #           returns the first (or only) value.
-</span><span class="">  650: # ---------------------------------------------------------------------------
-</span><span class="">  651: sub _extract_label {
-</span><span class="">  652: 	my ($item) = @_;
-</span><span class="">  653: 
-</span><span class="">  654: 	# Try the compact key first; fall back to the full RDF URI form.
-</span><span class="">  655: 	my $label = $item-&gt;{$RDFS_LABEL} // $item-&gt;{$RDFS_LABEL_FULL};
-</span><span class="">  656: 	return unless defined $label;
-</span><span class="">  657: 
-</span><span class="">  658: 	# If the label is multi-valued, take the first entry.
-</span><span class="">  659: 	return ref($label) eq &#39;ARRAY&#39; ? $label-&gt;[0] : $label;
-</span><span class="">  660: }
-</span><span class="">  661: 
-</span><span class="">  662: # ---------------------------------------------------------------------------
-</span><span class="">  663: # _parse_graph(\@graph)
-</span><span class="">  664: #
-</span><span class="">  665: # Purpose:  Iterate over a JSON-LD @graph array and partition items into
-</span><span class="">  666: #           Schema.org class definitions and property definitions.
-</span><span class="">  667: # Entry:    $graph_ref is an arrayref of item hashrefs as decoded from the
-</span><span class="">  668: #           Schema.org JSON-LD vocabulary.
-</span><span class="">  669: # Returns:  Two hashrefs: (\%classes, \%properties), each keyed by label.
-</span><span class="">  670: #           Items are also indexed by the short name extracted from their
-</span><span class="">  671: #           @id URI so that both &#39;MusicEvent&#39; and its label resolve correctly.
-</span><span class="">  672: # Side fx:  None.
-</span><span class="">  673: # Notes:    Items with no recognisable label or @type are silently skipped.
-</span><span class="">  674: #           The @id short-name index uses //= so the label always wins if
-</span><span class="">  675: #           it differs.
-</span><span class="">  676: # ---------------------------------------------------------------------------
-</span><span class="">  677: sub _parse_graph {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">678 → 683 → 718</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">678 → 683 → 0</span></span>  678: 	my ($graph_ref) = @_;
-</span><span class="">  679: 
-</span><span class="">  680: 	my (%classes, %props);
-</span><span class="">  681: 
-</span><span class="">  682: 	# Iterate every item in the JSON-LD graph array.
-</span><span class="">  683: 	for my $item (@{$graph_ref}) {
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">639 → 639 → 0</span></span>  639: 	return (\%classes, \%props);
+</span><span class="">  640: }
+</span><span class="">  641: 
+</span><span class="">  642: # ===========================================================================
+</span><span class="">  643: # END OF MODULE POD
+</span><span class="">  644: # ===========================================================================
+</span><span class="">  645: 
+</span><span class="">  646: =encoding utf-8
+</span><span class="">  647: 
+</span><span class="">  648: =head1 FILES
+</span><span class="">  649: 
+</span><span class="">  650: =head2 schemaorg_dynamic_vocabulary.jsonld
+</span><span class="">  651: 
+</span><span class="">  652: Cache file written to C&lt;$CACHEDIR&gt; (if set) or the system temporary directory
+</span><span class="">  653: (C&lt;File::Spec-E&lt;gt&gt;tmpdir()&gt;), unless overridden via C&lt;$config{cache_file}&gt;.
+</span><span class="">  654: Contains the downloaded Schema.org vocabulary in JSON-LD format.  Refreshed
+</span><span class="">  655: when older than C&lt;$config{cache_duration}&gt; seconds.
+</span><span class="">  656: 
+</span><span class="">  657: =head1 ERROR HANDLING
+</span><span class="">  658: 
+</span><span class="">  659: The module uses C&lt;carp&gt; rather than C&lt;die&gt; for recoverable failures:
+</span><span class="">  660: 
+</span><span class="">  661: =over 4
+</span><span class="">  662: 
+</span><span class="">  663: =item * Failed HTTP requests emit C&lt;carp&gt; and trigger the stale-cache fallback.
+</span><span class="">  664: 
+</span><span class="">  665: =item * JSON parse errors emit C&lt;carp&gt; and return C&lt;{}&gt;.
+</span><span class="">  666: 
+</span><span class="">  667: =item * File I/O errors emit C&lt;carp&gt;; the download path is attempted next.
+</span><span class="">  668: 
+</span><span class="">  669: =item * C&lt;croak&gt; is reserved for programmer errors (bad argument types).
+</span><span class="">  670: 
+</span><span class="">  671: =back
+</span><span class="">  672: 
+</span><span class="">  673: =head1 BUGS
+</span><span class="">  674: 
+</span><span class="">  675: =over 4
+</span><span class="">  676: 
+</span><span class="">  677: =item * Cache invalidation is time-based only; no checksum or version check.
+</span><span class="">  678: 
+</span><span class="">  679: =back
+</span><span class="">  680: 
+</span><span class="">  681: =head1 SEE ALSO
+</span><span class="">  682: 
+</span><span class="">  683: =over 4
 </span><span class="">  684: 
-</span><span class="">  685: 		# Skip items that do not declare an RDF type.
-</span><span class="">  686: 		next unless exists $item-&gt;{&#39;@type&#39;};
-</span><span class="">  687: 		my $item_type = $item-&gt;{&#39;@type&#39;};
+</span><span class="">  685: =item * L&lt;Test Dashboard|https://nigelhorne.github.io/Schema-Validator/coverage/&gt;
+</span><span class="">  686: 
+</span><span class="">  687: =back
 </span><span class="">  688: 
-</span><span class="">  689: 		# Normalise @type: the spec allows either a scalar or an array.
-</span><span class="">  690: 		my @types = ref($item_type) eq &#39;ARRAY&#39; ? @{$item_type} : ($item_type);
-</span><span class="">  691: 
-</span><span class="">  692: 		# Extract the human-readable label; skip items with none.
-</span><span class="">  693: 		my $label = _extract_label($item) or next;
+</span><span class="">  689: =head1 REPOSITORY
+</span><span class="">  690: 
+</span><span class="">  691: L&lt;https://github.com/nigelhorne/schema-validator&gt;
+</span><span class="">  692: 
+</span><span class="">  693: =head2 FORMAL SPECIFICATION
 </span><span class="">  694: 
-</span><span class="">  695: 		# Index rdfs:Class items under their label and their @id short name.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  696: 		if (grep { $_ eq $RDF_CLASS } @types) {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_696_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  697: 			$classes{$label} = $item;
-</span><span class="">  698: 
-</span><span class="">  699: 			# Secondary index by short URI fragment (e.g. &#39;MusicGroup&#39;).
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  700: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_700_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  701: 				(my $short = $id) =~ s{.*/}{};
-</span><span class="">  702: 				$classes{$short} //= $item;
-</span><span class="">  703: 			}
-</span><span class="">  704: 		}
-</span><span class="">  705: 
-</span><span class="">  706: 		# Index rdf:Property items under their label and @id short name.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  707: 		if (grep { $_ eq $RDF_PROPERTY } @types) {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_707_3: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  708: 			$props{$label} = $item;
-</span><span class="">  709: 
-</span><span class="">  710: 			# Secondary index by short URI fragment (e.g. &#39;startDate&#39;).
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  711: 			if (my $id = $item-&gt;{&#39;@id&#39;}) {
-</span>
-					<details class="mutant-details">
-					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
-					<ul>
-				<li><b>COND_INV_711_4: Invert condition if to unless</b><br>MEDIUM: Add tests asserting both true and false outcomes
-</li></ul></details>
-<span class="">  712: 				(my $short = $id) =~ s{.*/}{};
-</span><span class="">  713: 				$props{$short} //= $item;
-</span><span class="">  714: 			}
-</span><span class="">  715: 		}
-</span><span class="">  716: 	}
+</span><span class="">  695: =head3 is_valid_datetime
+</span><span class="">  696: 
+</span><span class="">  697:     Let CHAR denote the set of all Unicode code points and
+</span><span class="">  698:     DIGIT = { c : CHAR | c in {&#39;0&#39;..&#39;9&#39;} }.
+</span><span class="">  699:     Let seqN(S) = { s : seq S | #s = N }.
+</span><span class="">  700: 
+</span><span class="">  701:     YEAR     &acirc;&#137;&#156;  seqN(4, DIGIT)
+</span><span class="">  702:     MONTH    &acirc;&#137;&#156;  seqN(2, DIGIT)
+</span><span class="">  703:     DAY      &acirc;&#137;&#156;  seqN(2, DIGIT)
+</span><span class="">  704:     HOUR     &acirc;&#137;&#156;  seqN(2, DIGIT)
+</span><span class="">  705:     MINUTE   &acirc;&#137;&#156;  seqN(2, DIGIT)
+</span><span class="">  706:     SECOND   &acirc;&#137;&#156;  seqN(2, DIGIT)
+</span><span class="">  707:     SEP      &acirc;&#137;&#156;  { &#39;T&#39;, &#39; &#39; }
+</span><span class="">  708: 
+</span><span class="">  709:     DATE     &acirc;&#137;&#156;  { d : seq CHAR | &acirc;&#136;&#131; y &acirc;&#136;&#136; YEAR; mo &acirc;&#136;&#136; MONTH; dy &acirc;&#136;&#136; DAY
+</span><span class="">  710:                     &acirc;&#128;&cent; d = y &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;-&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; mo &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;-&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; dy }
+</span><span class="">  711: 
+</span><span class="">  712:     HHMM     &acirc;&#137;&#156;  { t : seq CHAR | &acirc;&#136;&#131; h &acirc;&#136;&#136; HOUR; m &acirc;&#136;&#136; MINUTE
+</span><span class="">  713:                     &acirc;&#128;&cent; t = h &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; m }
+</span><span class="">  714: 
+</span><span class="">  715:     HHMMSS   &acirc;&#137;&#156;  { t : seq CHAR | &acirc;&#136;&#131; h &acirc;&#136;&#136; HOUR; m &acirc;&#136;&#136; MINUTE; s &acirc;&#136;&#136; SECOND
+</span><span class="">  716:                     &acirc;&#128;&cent; t = h &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; m &acirc;&#140;&cent; &acirc;&#159;&uml;&#39;:&#39;&acirc;&#159;&copy; &acirc;&#140;&cent; s }
 </span><span class="">  717: 
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">718 → 718 → 0</span></span>  718: 	return (\%classes, \%props);
-</span><span class="">  719: }
+</span><span class="">  718:     TIMEFRAG &acirc;&#137;&#156;  { tf : seq CHAR | &acirc;&#136;&#131; sep &acirc;&#136;&#136; SEP; hm &acirc;&#136;&#136; (HHMM &acirc;&#136;&ordf; HHMMSS)
+</span><span class="">  719:                     &acirc;&#128;&cent; tf = &acirc;&#159;&uml;sep&acirc;&#159;&copy; &acirc;&#140;&cent; hm }
 </span><span class="">  720: 
-</span><span class="">  721: # ===========================================================================
-</span><span class="">  722: # END OF MODULE POD
-</span><span class="">  723: # ===========================================================================
-</span><span class="">  724: 
-</span><span class="">  725: =head1 DEPENDENCIES
-</span><span class="">  726: 
-</span><span class="">  727: =over 4
-</span><span class="">  728: 
-</span><span class="">  729: =item * L&lt;JSON::MaybeXS&gt; -- JSON decoding
-</span><span class="">  730: 
-</span><span class="">  731: =item * L&lt;LWP::UserAgent&gt; -- HTTP client for vocabulary download
+</span><span class="">  721:     DATETIME &acirc;&#137;&#156;  DATE &acirc;&#136;&ordf; { dt : seq CHAR | &acirc;&#136;&#131; d &acirc;&#136;&#136; DATE; tf &acirc;&#136;&#136; TIMEFRAG
+</span><span class="">  722:                            &acirc;&#128;&cent; dt = d &acirc;&#140;&cent; tf }
+</span><span class="">  723: 
+</span><span class="">  724:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  725:      IsValidDatetime
+</span><span class="">  726:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  727:      str?    : seq CHAR
+</span><span class="">  728:      result! : B
+</span><span class="">  729:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  730:      result! &acirc;&#159;&ordm; str? &acirc;&#136;&#136; DATETIME
+</span><span class="">  731:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
 </span><span class="">  732: 
-</span><span class="">  733: =item * L&lt;Params::Get&gt; -- positional/named parameter normalisation
+</span><span class="">  733: =head3 load_dynamic_library
 </span><span class="">  734: 
-</span><span class="">  735: =item * L&lt;Params::Validate&gt; -- runtime parameter type checking
-</span><span class="">  736: 
-</span><span class="">  737: =item * L&lt;Readonly&gt; -- compile-time constants
-</span><span class="">  738: 
-</span><span class="">  739: =item * L&lt;Encode&gt; -- character encoding utilities
-</span><span class="">  740: 
-</span><span class="">  741: =back
-</span><span class="">  742: 
-</span><span class="">  743: Optional: L&lt;Object::Configure&gt; for injecting C&lt;%config&gt; overrides without
-</span><span class="">  744: directly modifying the package namespace.
+</span><span class="">  735:     Let FILE, DUR, URL be the resolved config values.
+</span><span class="">  736:     Let now : N be the current UNIX epoch time.
+</span><span class="">  737:     Let mtime : PATH -&gt; N map a path to its last-modification time.
+</span><span class="">  738:     Let readable, writeable : PATH -&gt; B be filesystem predicates.
+</span><span class="">  739:     Let reachable : URL -&gt; B test HTTP reachability.
+</span><span class="">  740:     Let slurp : PATH -&gt; seq CHAR and spit : PATH x seq CHAR -&gt; 1.
+</span><span class="">  741:     Let fetch : URL x N -&gt; seq CHAR (second arg is timeout).
+</span><span class="">  742:     Let decode_json : seq CHAR -&gt; ITEM.
+</span><span class="">  743:     Let label : ITEM -&gt; (LABEL | {}) extract rdfs:label.
+</span><span class="">  744:     Let types : ITEM -&gt; P TYPE extract @type values.
 </span><span class="">  745: 
-</span><span class="">  746: =head1 FILES
+</span><span class="">  746:     FRESH &acirc;&#137;&#156; ( -e(FILE) ) &acirc;&#136;&sect; ( (now - mtime(FILE)) &lt; DUR )
 </span><span class="">  747: 
-</span><span class="">  748: =head2 schemaorg_dynamic_vocabulary.jsonld
-</span><span class="">  749: 
-</span><span class="">  750: Cache file written to the current working directory (or the path specified
-</span><span class="">  751: in C&lt;$config{cache_file}&gt;).  Contains the downloaded Schema.org vocabulary
-</span><span class="">  752: in JSON-LD format.  Refreshed when older than C&lt;$config{cache_duration}&gt;
-</span><span class="">  753: seconds.
-</span><span class="">  754: 
-</span><span class="">  755: =head1 ERROR HANDLING
-</span><span class="">  756: 
-</span><span class="">  757: The module uses C&lt;carp&gt; rather than C&lt;die&gt; for recoverable failures:
-</span><span class="">  758: 
-</span><span class="">  759: =over 4
-</span><span class="">  760: 
-</span><span class="">  761: =item * Failed HTTP requests emit C&lt;carp&gt; and trigger the stale-cache fallback.
+</span><span class="">  748:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  749:      LoadDynamicVocabulary
+</span><span class="">  750:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  751:      &Icirc;&#148;VocabularyStore
+</span><span class="">  752:      cache_file?     : PATH
+</span><span class="">  753:      cache_duration? : N
+</span><span class="">  754:      vocab_url?      : URL
+</span><span class="">  755:      ua_timeout?     : N
+</span><span class="">  756:      result!         : CLASS_LABEL &acirc;&#135;&cedil; ITEM
+</span><span class="">  757:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
+</span><span class="">  758:      content : seq CHAR
+</span><span class="">  759: 
+</span><span class="">  760:      FRESH &acirc;&#136;&sect; readable(cache_file?)
+</span><span class="">  761:          &acirc;&#135;&#146; content = slurp(cache_file?)
 </span><span class="">  762: 
-</span><span class="">  763: =item * JSON parse errors emit C&lt;carp&gt; and return C&lt;{}&gt;.
-</span><span class="">  764: 
-</span><span class="">  765: =item * File I/O errors emit C&lt;carp&gt;; the download path is attempted next.
+</span><span class="">  763:      &Acirc;&not;FRESH &acirc;&#136;&sect; reachable(vocab_url?)
+</span><span class="">  764:          &acirc;&#135;&#146; content = fetch(vocab_url?, ua_timeout?)
+</span><span class="">  765:            &acirc;&#136;&sect; ( writeable(cache_file?) &acirc;&#135;&#146; spit(cache_file?, content) )
 </span><span class="">  766: 
-</span><span class="">  767: =item * C&lt;croak&gt; is reserved for programmer errors (bad argument types).
-</span><span class="">  768: 
-</span><span class="">  769: =back
-</span><span class="">  770: 
-</span><span class="">  771: =head1 BUGS
-</span><span class="">  772: 
-</span><span class="">  773: =over 4
-</span><span class="">  774: 
-</span><span class="">  775: =item * The CWD-relative cache file path may resolve unexpectedly when the
-</span><span class="">  776: calling application changes directory between calls.  Use an absolute path
-</span><span class="">  777: via C&lt;$config{cache_file}&gt; to avoid this.
-</span><span class="">  778: 
-</span><span class="">  779: =item * Cache invalidation is time-based only; no checksum or version check.
-</span><span class="">  780: 
-</span><span class="">  781: =back
+</span><span class="">  767:      &Acirc;&not;FRESH &acirc;&#136;&sect; &Acirc;&not;reachable(vocab_url?) &acirc;&#136;&sect; -e(cache_file?)
+</span><span class="">  768:          &acirc;&#135;&#146; content = slurp(cache_file?)
+</span><span class="">  769: 
+</span><span class="">  770:      graph &acirc;&#137;&#156; (decode_json content)[AT_GRAPH]
+</span><span class="">  771: 
+</span><span class="">  772:      dynamic_schema&#39; =
+</span><span class="">  773:          { item &acirc;&#136;&#136; graph | RDF_CLASS &acirc;&#136;&#136; types(item) &acirc;&#136;&sect; label(item) &acirc;&#137;&nbsp; &acirc;&#136;&#133;
+</span><span class="">  774:            &acirc;&#128;&cent; label(item) &acirc;&#134;&brvbar; item }
+</span><span class="">  775: 
+</span><span class="">  776:      dynamic_properties&#39; =
+</span><span class="">  777:          { item &acirc;&#136;&#136; graph | RDF_PROPERTY &acirc;&#136;&#136; types(item) &acirc;&#136;&sect; label(item) &acirc;&#137;&nbsp; &acirc;&#136;&#133;
+</span><span class="">  778:            &acirc;&#128;&cent; label(item) &acirc;&#134;&brvbar; item }
+</span><span class="">  779: 
+</span><span class="">  780:      result! = dynamic_schema&#39;
+</span><span class="">  781:     &acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;&acirc;&#148;&#128;
 </span><span class="">  782: 
-</span><span class="">  783: =head1 SEE ALSO
+</span><span class="">  783: =head1 AUTHOR
 </span><span class="">  784: 
-</span><span class="">  785: =over 4
+</span><span class="">  785: Nigel Horne, C&lt;&lt; &lt;njh at nigelhorne.com&gt; &gt;&gt;
 </span><span class="">  786: 
-</span><span class="">  787: =item * L&lt;Test Dashboard|https://nigelhorne.github.io/Schema-Validator/coverage/&gt;
+</span><span class="">  787: =head1 LICENCE AND COPYRIGHT
 </span><span class="">  788: 
-</span><span class="">  789: =back
+</span><span class="">  789: Copyright 2025-2026 Nigel Horne.
 </span><span class="">  790: 
-</span><span class="">  791: =head1 REPOSITORY
-</span><span class="">  792: 
-</span><span class="">  793: L&lt;https://github.com/nigelhorne/schema-validator&gt;
+</span><span class="">  791: Usage is subject to the GPL2 licence terms.
+</span><span class="">  792: If you use it,
+</span><span class="">  793: please let me know.
 </span><span class="">  794: 
-</span><span class="">  795: =head1 AUTHOR
+</span><span class="">  795: =cut
 </span><span class="">  796: 
-</span><span class="">  797: Nigel Horne, C&lt;&lt; &lt;njh at nigelhorne.com&gt; &gt;&gt;
-</span><span class="">  798: 
-</span><span class="">  799: =head1 LICENCE AND COPYRIGHT
-</span><span class="">  800: 
-</span><span class="">  801: Copyright 2025-2026 Nigel Horne.
-</span><span class="">  802: 
-</span><span class="">  803: Usage is subject to the GPL2 licence terms.
-</span><span class="">  804: If you use it,
-</span><span class="">  805: please let me know.
-</span><span class="">  806: 
-</span><span class="">  807: =cut
-</span><span class="">  808: 
-</span><span class="">  809: 1;
+</span><span class="">  797: 1;
 </span></pre>
 
 <script>
