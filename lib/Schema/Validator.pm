@@ -526,6 +526,14 @@ sub load_dynamic_vocabulary {
 		return {};
 	}
 
+	# Guard against decode_json returning a non-object (e.g. a JSON array,
+	# a bare number, or any other non-hash type).  Calling exists on a
+	# non-hashref dies; catching it here keeps the "never throws" contract.
+	unless (ref($data) eq 'HASH') {
+		carp "Vocabulary JSON is not a JSON object";
+		return {};
+	}
+
 	# Confirm the expected JSON-LD graph structure is present.
 	unless (exists $data->{$AT_GRAPH} && ref($data->{$AT_GRAPH}) eq 'ARRAY') {
 		carp "Vocabulary JSON is missing the '\@graph' array";

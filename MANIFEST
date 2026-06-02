@@ -14,6 +14,7 @@ samples/sample2.html
 samples/sample3.html
 samples/sample4.html
 t/30-basics.t
+t/edge_cases.t
 t/eof.t
 t/eol.t
 t/function.t
