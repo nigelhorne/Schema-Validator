@@ -153,7 +153,7 @@
 
 <tbody>
 
-<tr class="low"><td><a href="lib-Schema-Validator-pm.html" title="View coverage line by line" target="_blank">lib/Schema/Validator.pm</a> <a href="https://github.com/nigelhorne/Schema-Validator/blob/a533427e28e95114ebf848a6fd5ba6314de0a8f8/lib/Schema/Validator.pm" class="icon-link" title="View source on GitHub">&#128269;</a><canvas class="sparkline" width="80" height="20" data-points="29.1"></canvas></td><td>34.4</td><td>8.7</td><td>10.0</td><td>70.0</td><td><span class="coverage-badge badge-bad" title="Needs improvement">29.1%</span></td><td class="neutral" title="Previous: 29.1%">&#9679; 0.0%</td></tr>
+<tr class="low"><td><a href="lib-Schema-Validator-pm.html" title="View coverage line by line" target="_blank">lib/Schema/Validator.pm</a> <a href="https://github.com/nigelhorne/Schema-Validator/blob/cc9acac46e65ebae20e72ecfe0ef7774405d7780/lib/Schema/Validator.pm" class="icon-link" title="View source on GitHub">&#128269;</a><canvas class="sparkline" width="80" height="20" data-points="29.1,29.1"></canvas></td><td>34.4</td><td>8.7</td><td>10.0</td><td>70.0</td><td><span class="coverage-badge badge-bad" title="Needs improvement">29.1%</span></td><td class="neutral" title="Previous: 29.1%">&#9679; 0.0%</td></tr>
 <tr class="summary-row nosort"><td colspan="2"><strong>Summary</strong></td><td colspan="2">1 files</td><td colspan="3">Avg: 29%, Low: 1</td></tr>
 <tr class="low nosort"><td><strong>Total</strong></td><td>34.4</td><td>8.7</td><td>10.0</td><td>70.0</td><td colspan="2"><strong>29.1</strong></td></tr>
 </tbody></table>
@@ -202,7 +202,8 @@ function linearRegression(data) {
 }
 
 
-const dataPoints = [ { x: "2026-06-02T14:57:56+00:00", y: 29.0748898678414, delta: 0, url: "https://github.com/nigelhorne/Schema-Validator/commit/4cf5d1411b7c7162aa4040ec174d7af416442b5e", label: "2026-06-02T14:57:56+00:00", pointBackgroundColor: "gray", comment: "Update mutation results (2026-06-02 eeb03d4)" } ];
+const dataPoints = [ { x: "2026-06-02T14:57:56+00:00", y: 29.0748898678414, delta: 0, url: "https://github.com/nigelhorne/Schema-Validator/commit/4cf5d1411b7c7162aa4040ec174d7af416442b5e", label: "2026-06-02T14:57:56+00:00", pointBackgroundColor: "gray", comment: "Update mutation results (2026-06-02 eeb03d4)" },
+{ x: "2026-06-02T15:16:10+00:00", y: 29.0748898678414, delta: 0.0, url: "https://github.com/nigelhorne/Schema-Validator/commit/1b5395d8a80429ee203361f046099f2e142ffb95", label: "2026-06-02T15:16:10+00:00", pointBackgroundColor: "gray", comment: "Update mutation results (2026-06-02 a533427)" } ];
 const regressionPoints = linearRegression(dataPoints);
 // Try to register the zoom plugin (handles different UMD builds)
 (function registerZoomPlugin(){
@@ -458,8 +459,8 @@ function refresh(){
 <h3>Failure Summary (all reports)</h3>
 <ul>
 <li><b>Perl 5.8.x</b>: 2 failures</li>
-<li><b>openbsd</b>: 1 failures</li>
-<li><b>5.8 / linux</b>: 1 failures</li>
+<li><b>linux</b>: 1 failures</li>
+<li><b>5.8 / freebsd</b>: 1 failures</li>
 </ul>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -548,21 +549,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <tr class="cpan-fail"><td>2025-12-13T22:00:00Z</td><td>freebsd</td><td>5.8.9</td><td>Slaven Rezi&#x107;</td><td></td>
 				<td><a href="https://www.cpantesters.org/cpan/report/3426c2b2-d86f-11f0-a093-4fe16d8775ea" target="_blank">View</a></td></tr>
-<tr class="cpan-fail"><td>2025-12-12T23:38:00Z</td><td>linux</td><td>5.8.9</td><td>David Cantrell (DCANTRELL)</td><td></td>
-				<td><a href="https://www.cpantesters.org/cpan/report/a5653196-d7b3-11f0-8802-12d856d3f2c2" target="_blank">View</a></td></tr>
 <tr class="cpan-fail"><td>2025-12-17T19:49:00Z</td><td>openbsd</td><td>5.42.0</td><td>Nigel Horne</td><td></td>
 				<td><a href="https://www.cpantesters.org/cpan/report/8463b2c0-db81-11f0-b3f4-c798274d1688" target="_blank">View</a></td></tr>
+<tr class="cpan-fail"><td>2025-12-12T23:38:00Z</td><td>linux</td><td>5.8.9</td><td>David Cantrell (DCANTRELL)</td><td></td>
+				<td><a href="https://www.cpantesters.org/cpan/report/a5653196-d7b3-11f0-8802-12d856d3f2c2" target="_blank">View</a></td></tr>
 </tbody></table>
 <h2>Mutation Report</h2>
 <h3>Mutation Summary</h3>
 <ul>
-<li><b>Score</b>: 100%</li>
-<li><b>Total</b>: 0</li>
+<li><b>Score</b>: 0.00%</li>
+<li><b>Total</b>: 27</li>
 <li><b>Killed</b>: 
 0
 </li>
 <li><b>Survived</b>: 
-0
+27
 </li>
 </ul>
 <h3>Mutation Files</h3>
@@ -571,6 +572,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <tr><th>File</th><th>Total</th><th>Killed</th><th>Survivors</th><th>Skipped</th><th>Score%</th><th>Complexity</th><th title="TER1=Statement, TER2=Branch, TER3=LCSAJ Path">TER1 / TER2 / TER3</th></tr>
 
+<tr class="low"><td><a href="mutation_html/lib/Schema/Validator.pm.html" title="View mutation line by line" target="_blank">lib/Schema/Validator.pm</a> <a href="https://github.com/nigelhorne/Schema-Validator/blob/cc9acac46e65ebae20e72ecfe0ef7774405d7780/lib/Schema/Validator.pm" class="icon-link" title="View source on GitHub">&#128269;</a></td><td>27</td><td>0</td><td>27</td><td>0</td><td><span class="coverage-badge badge-bad" title="Needs improvement">0.0%</span></td><td><span class="coverage-badge badge-good" title="Good">27</span></td><td><span class="coverage-badge badge-bad" title="Needs improvement">34.4%</span> / <span class="coverage-badge badge-bad" title="Needs improvement">8.7%</span> / <span class="coverage-badge badge-bad" title="Needs improvement">0.0%</span></td></tr>
 </table>
 
 <h2>Structural Coverage (Approximate)</h2>
@@ -581,11 +583,11 @@ Branch Coverage: 8.70% (4 / 46)<br>
 </div>
 <h2>Executive Summary</h2>
 <div class='summary'>
-Tests execute 34.35% of the code. No mutation data available yet — trigger the mutation workflow for fault detection analysis.
+Tests execute 34.35% of the code but detect only 0.00% of injected faults — consider adding targeted tests to kill surviving mutants.
 </div>
 <footer>
 	<p>Project: <a href="https://github.com/nigelhorne/Schema-Validator">Schema-Validator</a></p>
-	<p><em>Last updated: 2026-06-02 15:09:24 - <a href="https://github.com/nigelhorne/Schema-Validator/commit/a533427e28e95114ebf848a6fd5ba6314de0a8f8">commit <code>a533427</code></a></em></p>
+	<p><em>Last updated: 2026-06-02 15:24:14 - <a href="https://github.com/nigelhorne/Schema-Validator/commit/cc9acac46e65ebae20e72ecfe0ef7774405d7780">commit <code>cc9acac</code></a></em></p>
 	<p style="float: right; font-size: 0.85em; color: #999;">Powered by <a href="https://metacpan.org/dist/App-Test-Generator">App::Test::Generator 0.38</a></p>
 </footer>
 </body>

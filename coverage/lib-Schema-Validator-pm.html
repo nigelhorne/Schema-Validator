@@ -30,19 +30,19 @@ https://pjcj.net
 <tr><td class="h">4</td><td></td><td></td><td></td><td></td><td></td><td class="s"># Schema::Validator -- ISO 8601 datetime validation and Schema.org vocabulary</td></tr>
 <tr><td class="h">5</td><td></td><td></td><td></td><td></td><td></td><td class="s"># loading.&nbsp;&nbsp;Purely functional; all symbols are opt-in via import list.</td></tr>
 <tr><td class="h">6</td><td></td><td></td><td></td><td></td><td></td><td class="s"># ---------------------------------------------------------------------------</td></tr>
-<tr><td class="h">7</td><td colspan="6"></td></tr><tr><td class="h">8</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L8">1</a></div></td><td><div>64889</div><div>1</div><div>9</div></td><td class="s">use strict;</td></tr>
-<tr><td class="h">9</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L9">1</a></div></td><td><div>2</div><div>0</div><div>17</div></td><td class="s">use warnings;</td></tr>
-<tr><td class="h">10</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L10">1</a></div></td><td><div>230</div><div>5941</div><div>2</div></td><td class="s">use autodie qw(:all);</td></tr>
-<tr><td class="h">11</td><td colspan="6"></td></tr><tr><td class="h">12</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L12">1</a></div></td><td><div>6980</div><div>1</div><div>19</div></td><td class="s">use Carp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(carp croak);</td></tr>
-<tr><td class="h">13</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L13">1</a></div></td><td><div>271</div><div>237966</div><div>31</div></td><td class="s">use DateTime::Format::ISO8601;</td></tr>
-<tr><td class="h">14</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L14">1</a></div></td><td><div>271</div><div>4252</div><div>40</div></td><td class="s">use Encode&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(decode encode);</td></tr>
-<tr><td class="h">15</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L15">1</a></div></td><td><div>3</div><div>1</div><div>24</div></td><td class="s">use JSON::MaybeXS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(decode_json);</td></tr>
-<tr><td class="h">16</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L16">1</a></div></td><td><div>326</div><div>19427</div><div>16</div></td><td class="s">use LWP::UserAgent;</td></tr>
-<tr><td class="h">17</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L17">1</a></div></td><td><div>180</div><div>4318</div><div>28</div></td><td class="s">use Params::Get&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(get_params);</td></tr>
-<tr><td class="h">18</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L18">1</a></div></td><td><div>315</div><div>13289</div><div>27</div></td><td class="s">use Params::Validate::Strict&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(validate_strict);</td></tr>
-<tr><td class="h">19</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L19">1</a></div></td><td><div>3</div><div>1</div><div>15</div></td><td class="s">use Readonly;</td></tr>
-<tr><td class="h">20</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L20">1</a></div></td><td><div>2</div><div>0</div><div>14</div></td><td class="s">use Scalar::Util&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(reftype);</td></tr>
-<tr><td class="h">21</td><td colspan="6"></td></tr><tr><td class="h">22</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L22">1</a></div></td><td><div>4</div><div>0</div><div>763</div></td><td class="s">use base &#39;Exporter&#39;;</td></tr>
+<tr><td class="h">7</td><td colspan="6"></td></tr><tr><td class="h">8</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L8">1</a></div></td><td><div>65852</div><div>1</div><div>10</div></td><td class="s">use strict;</td></tr>
+<tr><td class="h">9</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L9">1</a></div></td><td><div>1</div><div>1</div><div>17</div></td><td class="s">use warnings;</td></tr>
+<tr><td class="h">10</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L10">1</a></div></td><td><div>221</div><div>5817</div><div>2</div></td><td class="s">use autodie qw(:all);</td></tr>
+<tr><td class="h">11</td><td colspan="6"></td></tr><tr><td class="h">12</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L12">1</a></div></td><td><div>7026</div><div>1</div><div>35</div></td><td class="s">use Carp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(carp croak);</td></tr>
+<tr><td class="h">13</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L13">1</a></div></td><td><div>259</div><div>239442</div><div>31</div></td><td class="s">use DateTime::Format::ISO8601;</td></tr>
+<tr><td class="h">14</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L14">1</a></div></td><td><div>309</div><div>4375</div><div>42</div></td><td class="s">use Encode&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(decode encode);</td></tr>
+<tr><td class="h">15</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L15">1</a></div></td><td><div>3</div><div>1</div><div>25</div></td><td class="s">use JSON::MaybeXS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(decode_json);</td></tr>
+<tr><td class="h">16</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L16">1</a></div></td><td><div>315</div><div>19668</div><div>21</div></td><td class="s">use LWP::UserAgent;</td></tr>
+<tr><td class="h">17</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L17">1</a></div></td><td><div>188</div><div>4338</div><div>28</div></td><td class="s">use Params::Get&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(get_params);</td></tr>
+<tr><td class="h">18</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L18">1</a></div></td><td><div>313</div><div>13361</div><div>29</div></td><td class="s">use Params::Validate::Strict&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(validate_strict);</td></tr>
+<tr><td class="h">19</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L19">1</a></div></td><td><div>2</div><div>2</div><div>16</div></td><td class="s">use Readonly;</td></tr>
+<tr><td class="h">20</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L20">1</a></div></td><td><div>1</div><div>1</div><div>14</div></td><td class="s">use Scalar::Util&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qw(reftype);</td></tr>
+<tr><td class="h">21</td><td colspan="6"></td></tr><tr><td class="h">22</td><td><div class="c3">1</div><div class="c3">1</div><div class="c3">1</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L22">1</a></div></td><td><div>4</div><div>1</div><div>737</div></td><td class="s">use base &#39;Exporter&#39;;</td></tr>
 <tr><td class="h">23</td><td colspan="6"></td></tr><tr><td class="h">24</td><td></td><td></td><td></td><td></td><td></td><td class="s"># Only these two symbols may be imported by callers via &#39;use ... qw(...)&#39;.</td></tr>
 <tr><td class="h">25</td><td></td><td></td><td></td><td></td><td></td><td class="s">our @EXPORT_OK = qw(is_valid_datetime load_dynamic_vocabulary);</td></tr>
 <tr><td class="h">26</td><td colspan="6"></td></tr><tr><td class="h">27</td><td></td><td></td><td></td><td></td><td></td><td class="s">our $VERSION = &#39;0.02&#39;;</td></tr>
@@ -293,19 +293,19 @@ Timezone designators (C&lt;Z&gt;, C&lt;+HH:MM&gt;, C&lt;-HH:MM&gt;) are now acce
 <tr><td class="h">286</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Accept both positional (is_valid_datetime($s)) and named</td></tr>
 <tr><td class="h">287</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# (is_valid_datetime(string =&gt; $s)) calling conventions.</td></tr>
 <tr><td class="h">288</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Validate: value must be a scalar or undef (undef returns 0 cleanly below).</td></tr>
-<tr><td class="h">289</td><td><div class="c3">13</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L289">13</a></div></td><td><div>91967</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my $p = validate_strict(</td></tr>
+<tr><td class="h">289</td><td><div class="c3">13</div></td><td></td><td></td><td><div class="c3"><a href="lib-Schema-Validator-pm--subroutine.html#L289">13</a></div></td><td><div>96511</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my $p = validate_strict(</td></tr>
 <tr><td class="h">290</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input =&gt; get_params(&#39;string&#39;, \@_),</td></tr>
 <tr><td class="h">291</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schema&nbsp;&nbsp;&nbsp;=&gt; { &#39;string&#39; =&gt; { type =&gt; &#39;string&#39;, optional =&gt; 0 } },</td></tr>
 <tr><td class="h">292</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);</td></tr>
-<tr><td class="h">293</td><td colspan="6"></td></tr><tr><td class="h">294</td><td><div class="c3">13</div></td><td></td><td></td><td></td><td><div>886</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my $string = $p-&gt;{string};</td></tr>
+<tr><td class="h">293</td><td colspan="6"></td></tr><tr><td class="h">294</td><td><div class="c3">13</div></td><td></td><td></td><td></td><td><div>937</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;my $string = $p-&gt;{string};</td></tr>
 <tr><td class="h">295</td><td colspan="6"></td></tr><tr><td class="h">296</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Treat undef or empty string as invalid without throwing.</td></tr>
-<tr><td class="h">297</td><td><div class="c3">13</div></td><td><div class="c3" title="T/F"><a href="lib-Schema-Validator-pm--branch.html#L297">100</a></div></td><td><div class="c3"><a href="lib-Schema-Validator-pm--condition.html#L297">100</a></div></td><td></td><td><div>28</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return 0 unless defined $string &amp;&amp; length $string;</td></tr>
+<tr><td class="h">297</td><td><div class="c3">13</div></td><td><div class="c3" title="T/F"><a href="lib-Schema-Validator-pm--branch.html#L297">100</a></div></td><td><div class="c3"><a href="lib-Schema-Validator-pm--condition.html#L297">100</a></div></td><td></td><td><div>26</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return 0 unless defined $string &amp;&amp; length $string;</td></tr>
 <tr><td class="h">298</td><td colspan="6"></td></tr><tr><td class="h">299</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Normalise the space-separator variant to T before handing off to the</td></tr>
 <tr><td class="h">300</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# module, which requires strict ISO 8601 (T separator only).</td></tr>
-<tr><td class="h">301</td><td><div class="c3">11</div></td><td></td><td></td><td></td><td><div>22</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(my $normalised = $string) =~ s/^(\d{4}-\d{2}-\d{2}) (?=\d{2}:)/$1T/;</td></tr>
+<tr><td class="h">301</td><td><div class="c3">11</div></td><td></td><td></td><td></td><td><div>20</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(my $normalised = $string) =~ s/^(\d{4}-\d{2}-\d{2}) (?=\d{2}:)/$1T/;</td></tr>
 <tr><td class="h">302</td><td colspan="6"></td></tr><tr><td class="h">303</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Delegate to DateTime::Format::ISO8601 for full semantic validation;</td></tr>
 <tr><td class="h">304</td><td></td><td></td><td></td><td></td><td></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# a truthy (DateTime) object means valid, undef/$@ means invalid.</td></tr>
-<tr><td class="h">305</td><td><div class="c3">11</div><div class="c3">11</div></td><td><div class="c3" title="T/F"><a href="lib-Schema-Validator-pm--branch.html#L305">100</a></div></td><td></td><td></td><td><div>6</div><div>17</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return eval { DateTime::Format::ISO8601-&gt;parse_datetime($normalised) } ? 1 : 0;</td></tr>
+<tr><td class="h">305</td><td><div class="c3">11</div><div class="c3">11</div></td><td><div class="c3" title="T/F"><a href="lib-Schema-Validator-pm--branch.html#L305">100</a></div></td><td></td><td></td><td><div>7</div><div>21</div></td><td class="s">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return eval { DateTime::Format::ISO8601-&gt;parse_datetime($normalised) } ? 1 : 0;</td></tr>
 <tr><td class="h">306</td><td></td><td></td><td></td><td></td><td></td><td class="s">}</td></tr>
 <tr><td class="h">307</td><td colspan="6"></td></tr><tr><td class="h">308</td><td></td><td></td><td></td><td></td><td></td><td class="s"># ===========================================================================</td></tr>
 <tr><td class="h">309</td><td colspan="6"></td></tr><tr><td class="h">310 - 463</td><td colspan="5"></td><td class="s"><pre>=head2 load_dynamic_vocabulary
@@ -674,7 +674,7 @@ unify them.
 <tr><td class="h">713</td><td colspan="6"></td></tr><tr><td class="h">714</td><td></td><td></td><td></td><td></td><td></td><td class="s"># ===========================================================================</td></tr>
 <tr><td class="h">715</td><td></td><td></td><td></td><td></td><td></td><td class="s"># END OF MODULE POD</td></tr>
 <tr><td class="h">716</td><td></td><td></td><td></td><td></td><td></td><td class="s"># ===========================================================================</td></tr>
-<tr><td class="h">717</td><td colspan="6"></td></tr><tr><td class="h">718 - 792</td><td colspan="5"></td><td class="s"><pre>=head1 DEPENDENCIES
+<tr><td class="h">717</td><td colspan="6"></td></tr><tr><td class="h">718 - 800</td><td colspan="5"></td><td class="s"><pre>=head1 DEPENDENCIES
 
 =over 4
 
@@ -732,6 +732,14 @@ via C&lt;$config{cache_file}&gt; to avoid this.
 
 =back
 
+=head1 SEE ALSO
+
+=over 4
+
+=item * L&lt;Test Dashboard|https://nigelhorne.github.io/Schema-Validator/coverage/&gt;
+
+=back
+
 =head1 REPOSITORY
 
 L&lt;https://github.com/nigelhorne/schema-validator&gt;
@@ -742,14 +750,14 @@ Nigel Horne, C&lt;&lt; &lt;njh at nigelhorne.com&gt; &gt;&gt;
 
 =head1 LICENCE AND COPYRIGHT
 
-Copyright 2025 Nigel Horne.
+Copyright 2025-2026 Nigel Horne.
 
 Usage is subject to the GPL2 licence terms.
 If you use it,
 please let me know.
 
 =cut</pre></td></tr>
-<tr><td class="h">793</td><td colspan="6"></td></tr><tr><td class="h">794</td><td></td><td></td><td></td><td></td><td></td><td class="s">1;</td></tr>
+<tr><td class="h">801</td><td colspan="6"></td></tr><tr><td class="h">802</td><td></td><td></td><td></td><td></td><td></td><td class="s">1;</td></tr>
 </table>
 </body>
 </html>
