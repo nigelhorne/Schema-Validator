@@ -3,6 +3,7 @@
 <html>
 <head>
 <meta charset="utf-8">
+<title>File: lib/Schema/Validator.pm</title>
 <style>
 
 /* --------------------------------------------------
@@ -236,6 +237,54 @@ pre details.mutant-details ul {
 	visibility: visible;
 }
 
+.cpd-dot {
+    color: #cc8800;
+    font-size: 10px;
+    margin-right: 3px;
+    cursor: help;
+    text-decoration: none;
+}
+a.cpd-dot { cursor: pointer; }
+a.cpd-dot:hover { color: #ff8800; }
+
+.cpd-tip {
+    position: relative;
+    display: inline-block;
+}
+
+.cpd-tip .cpd-tip-text {
+    visibility: hidden;
+    background-color: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.cpd-tip:hover .cpd-tip-text {
+    visibility: visible;
+}
+
+/* CPD drill-down page styles */
+.dup-line { background-color: #fff3cd; display: block; }
+.dup-line:hover { background-color: #ffe082; }
+.intra-dot { color: #9944cc; margin-right: 4px; cursor: help; text-decoration: none; }
+a.intra-dot { cursor: pointer; }
+a.intra-dot:hover { color: #7700bb; }
+.cpd-legend {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    display: inline-block;
+    padding: 6px 10px;
+    margin-bottom: 1em;
+    font-size: 0.9em;
+}
+
 </style>
 </head>
 <body>
@@ -246,7 +295,7 @@ pre details.mutant-details ul {
 <strong>Structural Coverage (Approximate)</strong><p>
 TER1 (Statement): 100.00%<br>
 TER2 (Branch): 100.00%<br>
-TER3 (LCSAJ): 100.0% (21/21)<br>
+TER3 (LCSAJ): 100.0% (9/9)<br>
 Approximate LCSAJ segments: 49<br>
 </div>
 
@@ -551,7 +600,7 @@ Approximate LCSAJ segments: 49<br>
 </span><span class="">  259: 	my $string = $p-&gt;{string};
 </span><span class="">  260: 
 </span><span class="">  261: 	# Treat undef or empty string as invalid without throwing.
-</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  262: 	return 0 unless defined $string &amp;&amp; length $string;
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  262: 	return 0 unless defined $string &amp;&amp; length $string;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
@@ -694,7 +743,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  381: =cut
 </span><span class="">  382: 
 </span><span class="">  383: sub load_dynamic_vocabulary {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">384 → 387 → 400</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">384 → 387 → 0</span></span>  384: 	my $params;
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">384 → 387 → 400</span></span>  384: 	my $params;
 </span><span class="">  385: 
 </span><span class="">  386: 	# Validate types of any supplied overrides (all are optional scalars).
 </span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  387: 	if(scalar(@_)) {
@@ -716,7 +765,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  397: 	}
 </span><span class="">  398: 
 </span><span class="">  399: 	# Merge caller overrides with module-level configuration defaults.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">400 → 409 → 415</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">400 → 409 → 0</span></span>  400: 	my $cache_file     = $params-&gt;{cache_file}     // $config{cache_file};
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">400 → 409 → 415</span></span>  400: 	my $cache_file     = $params-&gt;{cache_file}     // $config{cache_file};
 </span><span class="">  401: 	my $cache_duration = $params-&gt;{cache_duration} // $config{cache_duration};
 </span><span class="">  402: 	my $vocab_url      = $params-&gt;{vocab_url}      // $config{vocab_url};
 </span><span class="">  403: 	my $ua_timeout     = $params-&gt;{ua_timeout}     // $config{ua_timeout};
@@ -725,12 +774,12 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  406: 
 </span><span class="">  407: 	# Attempt to read a fresh cache file.  Open directly to avoid the TOCTOU
 </span><span class="">  408: 	# race that would exist between a separate -e test and the open call.
-</span><span class="survived-3 tooltip" data-tooltip="Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one). Mutation survived. Add targeted tests to validate this branch.">  409: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
+</span><span class="survived-3 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch. Boundary mutation survived. Add tests around edge values (e.g. min, max, off-by-one).">  409: 	if (-e $cache_file &amp;&amp; (time - (stat($cache_file))[9] &lt; $cache_duration)) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 4, Killed: 0, Survived: 4)</summary>
 					<ul>
-				<li><b>NUM_BOUNDARY_409_55_>: Numeric boundary flip < to ></b><br>HIGH: Likely missing edge-case test (boundary value)
+				<li><b>NUM_BOUNDARY_409_55_&gt;: Numeric boundary flip &lt; to &gt;</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -738,7 +787,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_409_55_<=: Numeric boundary flip < to <=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_409_55_&lt;=: Numeric boundary flip &lt; to &lt;=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -746,7 +795,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </pre>
 								</div>
-							</li><li><b>NUM_BOUNDARY_409_55_>=: Numeric boundary flip < to >=</b><br>HIGH: Likely missing edge-case test (boundary value)
+							</li><li><b>NUM_BOUNDARY_409_55_&gt;=: Numeric boundary flip &lt; to &gt;=</b><br>HIGH: Likely missing edge-case test (boundary value)
 
 								<div class="suggested-test">
 								<div class="suggest-label">🧪 Suggested Test</div>
@@ -761,7 +810,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  412: 	}
 </span><span class="">  413: 
 </span><span class="">  414: 	# If no usable content yet, try to download the vocabulary.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 436</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 0</span></span>  415: 	unless (defined $content) {
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">415 → 415 → 436</span></span>  415: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
@@ -806,7 +855,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  433: 	}
 </span><span class="">  434: 
 </span><span class="">  435: 	# All content-acquisition strategies failed; return empty result.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 442</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 0</span></span>  436: 	unless (defined $content) {
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">436 → 436 → 442</span></span>  436: 	unless (defined $content) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
@@ -818,7 +867,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  439: 	}
 </span><span class="">  440: 
 </span><span class="">  441: 	# Parse the JSON; treat errors as non-fatal warnings.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">442 → 443 → 451</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">442 → 443 → 0</span></span>  442: 	my $data = eval { decode_json($content) };
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">442 → 443 → 451</span></span>  442: 	my $data = eval { decode_json($content) };
 </span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch.">  443: 	if ($@) {
 </span>
 					<details class="mutant-details">
@@ -833,7 +882,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  448: 	# Guard against decode_json returning a non-object (e.g. a JSON array,
 </span><span class="">  449: 	# a bare number, or any other non-hash type).  Calling exists on a
 </span><span class="">  450: 	# non-hashref dies; catching it here keeps the &quot;never throws&quot; contract.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 457</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 0</span></span>  451: 	unless (ref($data) eq &#39;HASH&#39;) {
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">451 → 451 → 457</span></span>  451: 	unless (ref($data) eq &#39;HASH&#39;) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
@@ -845,7 +894,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  454: 	}
 </span><span class="">  455: 
 </span><span class="">  456: 	# Confirm the expected JSON-LD graph structure is present.
-</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 463</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 0</span></span>  457: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
+</span><span class="survived-1 tooltip" data-tooltip="Mutation survived. Add targeted tests to validate this branch."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">457 → 457 → 463</span></span>  457: 	unless (exists $data-&gt;{$AT_GRAPH} &amp;&amp; ref($data-&gt;{$AT_GRAPH}) eq &#39;ARRAY&#39;) {
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 1, Killed: 0, Survived: 1)</summary>
@@ -857,7 +906,7 @@ is( func(VALUE_AT_BOUNDARY), EXPECTED, &#39;Test boundary behaviour&#39; );
 </span><span class="">  460: 	}
 </span><span class="">  461: 
 </span><span class="">  462: 	# Delegate parsing to the internal graph processor.
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">463 → 477 → 0</span></span>  463: 	my ($classes, $props) = _parse_graph($data-&gt;{$AT_GRAPH});
+</span><span class="">  463: 	my ($classes, $props) = _parse_graph($data-&gt;{$AT_GRAPH});
 </span><span class="">  464: 
 </span><span class="">  465: 	# Populate package globals as documented side-effects.
 </span><span class="">  466: 	%dynamic_schema     = %{$classes};
@@ -921,7 +970,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  503: 	my $content = &lt;$fh&gt;;
 </span><span class="">  504: 
 </span><span class="">  505: 	close $fh;
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  506: 	return $content;
+</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  506: 	return $content;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
@@ -963,7 +1012,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  524: 	print $fh $content;
 </span><span class="">  525: 	close $fh;
 </span><span class="">  526: 
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  527: 	return 1;
+</span><span class="survived-2 tooltip" data-tooltip="Boolean logic mutation survived. Add tests covering both true and false paths. Return value mutation survived. Add tests asserting exact return values.">  527: 	return 1;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
@@ -1000,7 +1049,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  540: #           they need a guaranteed non-throwing call.
 </span><span class="">  541: # ---------------------------------------------------------------------------
 </span><span class="">  542: sub _fetch_url {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">543 → 550 → 555</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">543 → 550 → 0</span></span>  543: 	my ($url, $timeout) = @_;
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">543 → 550 → 555</span></span>  543: 	my ($url, $timeout) = @_;
 </span><span class="">  544: 
 </span><span class="">  545: 	# Build a minimal UA; timeout prevents indefinite hangs.
 </span><span class="">  546: 	my $ua  = LWP::UserAgent-&gt;new(timeout =&gt; $timeout);
@@ -1018,7 +1067,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  552: 		return;
 </span><span class="">  553: 	}
 </span><span class="">  554: 
-</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths."><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">555 → 555 → 0</span></span>  555: 	return $res-&gt;decoded_content;
+</span><span class="survived-2 tooltip" data-tooltip="Return value mutation survived. Add tests asserting exact return values. Boolean logic mutation survived. Add tests covering both true and false paths.">  555: 	return $res-&gt;decoded_content;
 </span>
 					<details class="mutant-details">
 					<summary>Mutants (Total: 2, Killed: 0, Survived: 2)</summary>
@@ -1081,7 +1130,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  594: #           it differs.
 </span><span class="">  595: # ---------------------------------------------------------------------------
 </span><span class="">  596: sub _parse_graph {
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">597 → 602 → 637</span></span><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">597 → 602 → 0</span></span>  597: 	my ($graph_ref) = @_;
+</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">597 → 602 → 637</span></span>  597: 	my ($graph_ref) = @_;
 </span><span class="">  598: 
 </span><span class="">  599: 	my (%classes, %props);
 </span><span class="">  600: 
@@ -1145,7 +1194,7 @@ is( func(INPUT), EXPECTED, &#39;Verify correct return value&#39; );
 </span><span class="">  634: 		}
 </span><span class="">  635: 	}
 </span><span class="">  636: 
-</span><span class=""><span class="lcsaj-tip"><span class="lcsaj-dot">●</span><span class="lcsaj-tip-text">637 → 637 → 0</span></span>  637: 	return (\%classes, \%props);
+</span><span class="">  637: 	return (\%classes, \%props);
 </span><span class="">  638: }
 </span><span class="">  639: 
 </span><span class="">  640: # ===========================================================================
@@ -1323,7 +1372,7 @@ function toggleTheme() {
 })();
 
 document.addEventListener("mousemove", function(e) {
-	document.querySelectorAll(".lcsaj-tip-text").forEach(function(tip) {
+	document.querySelectorAll(".lcsaj-tip-text, .cpd-tip-text").forEach(function(tip) {
 		tip.style.left = (e.clientX + 12) + "px";
 		tip.style.top  = (e.clientY + 12) + "px";
 	});
