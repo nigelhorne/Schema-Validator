@@ -7,13 +7,13 @@ requires 'Email::Valid';
 requires 'JSON::MaybeXS';
 requires 'LWP::Protocol::https';
 requires 'LWP::UserAgent';
-requires 'Mojolicious';
+requires 'Mojolicious';   # provides Mojo::DOM used in bin/ scripts
 requires 'Params::Get';
 requires 'Params::Validate::Strict';
 requires 'Readonly';
 
 on 'configure' => sub {
-	requires 'ExtUtils::MakeMaker', '6.64';
+	requires 'ExtUtils::MakeMaker', '6.64';   # Minimum version for TEST_REQUIRES
 };
 
 on 'test' => sub {
