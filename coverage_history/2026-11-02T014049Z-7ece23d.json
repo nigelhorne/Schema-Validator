@@ -1,0 +1,204 @@
+{
+   "runs" : [
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583711.11096,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "-e",
+         "start" : 1793583707.25948,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583707.34572,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "-e",
+         "start" : 1793583707.34565,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583707.68275,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/30-basics.t",
+         "start" : 1793583707.67759,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583708.17679,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/edge_cases.t",
+         "start" : 1793583708.11371,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583708.41961,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/eof.t",
+         "start" : 1793583708.41942,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583708.55765,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/eol.t",
+         "start" : 1793583708.55749,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583708.94363,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/extended_tests.t",
+         "start" : 1793583708.90274,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583709.42359,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/function.t",
+         "start" : 1793583709.38201,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583709.90898,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/integration.t",
+         "start" : 1793583709.70219,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583710.37965,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/mutant_killers.t",
+         "start" : 1793583710.34687,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583710.60884,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/pod.t",
+         "start" : 1793583710.6087,
+         "version" : "0.03"
+      },
+      {
+         "OS" : "linux",
+         "abstract" : "Tools for validating and loading Schema.org vocabulary definitions",
+         "dir" : "/home/runner/work/Schema-Validator/Schema-Validator",
+         "finish" : 1793583710.99297,
+         "name" : "Schema-Validator",
+         "perl" : "5.40.5",
+         "run" : "t/unit.t",
+         "start" : 1793583710.95611,
+         "version" : "0.03"
+      }
+   ],
+   "summary" : {
+      "Total" : {
+         "branch" : {
+            "covered" : 48,
+            "error" : 0,
+            "percentage" : 100,
+            "total" : 48,
+            "uncoverable" : 0
+         },
+         "condition" : {
+            "covered" : 24,
+            "error" : 6,
+            "percentage" : 80,
+            "total" : 30,
+            "uncoverable" : 0
+         },
+         "statement" : {
+            "covered" : 137,
+            "percentage" : 100,
+            "total" : 137
+         },
+         "subroutine" : {
+            "covered" : 21,
+            "percentage" : 100,
+            "total" : 21
+         },
+         "total" : {
+            "covered" : 230,
+            "error" : 6,
+            "percentage" : 97.4576271186441,
+            "total" : 236,
+            "uncoverable" : 0
+         }
+      },
+      "lib/Schema/Validator.pm" : {
+         "branch" : {
+            "covered" : 48,
+            "error" : 0,
+            "percentage" : 100,
+            "total" : 48,
+            "uncoverable" : 0
+         },
+         "condition" : {
+            "covered" : 24,
+            "error" : 6,
+            "percentage" : 80,
+            "total" : 30,
+            "uncoverable" : 0
+         },
+         "statement" : {
+            "covered" : 137,
+            "percentage" : 100,
+            "total" : 137
+         },
+         "subroutine" : {
+            "covered" : 21,
+            "percentage" : 100,
+            "total" : 21
+         },
+         "total" : {
+            "covered" : 230,
+            "error" : 6,
+            "percentage" : 97.4576271186441,
+            "total" : 236,
+            "uncoverable" : 0
+         }
+      }
+   }
+}
