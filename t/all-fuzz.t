@@ -197,11 +197,12 @@ for my $pm_file (@pm_files) {
 
 			if(exists $schema->{new} && !defined($schema->{new})) {
 				# new: null means SchemaExtractor could not generate representative
-				# constructor args (e.g. constructor needs a coderef or object param).
+				# constructor args (e.g. it needs a coderef or object param, or the class
+				# is abstract and refuses to build itself).
 				# Skip — the harness can't build $self automatically in this case.
 				push @fuzz_report, { module => $module, func => $func, status => 'oop' };
-				pass("$func: skipped (OOP instance method - constructor not auto-buildable, "
-									. "perhaps this is an abstract class?)");
+				pass("$func: skipped (OOP instance method - constructor not auto-buildable, " .
+					'perhaps this is an abstract class?)');
 				next;
 			}
 
